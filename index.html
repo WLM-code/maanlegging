@@ -1,0 +1,874 @@
+<!doctype html>
+<html lang="nl">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Maanlegging</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;600;800&family=Yellowtail&display=swap">
+<style>
+/* Layout: een koraalkleurig "scherm" op pastelvlekken, bovenaan het schriftlogo met tabs, daaronder kleurblokken (crème, geel) met afgeronde kaarten. Eén bewust speelse, eenkleurige look; alles loopt via tokens. */
+:root{
+  --blob-a:#ffd5c8; --blob-b:#c9f7f0; --blob-c:#ffe9e2;
+  --field:#ee4f2d; --field-deep:#d83f1f; --yellow:#ffe14a; --cream:#fff5e1; --ink:#3b130c; --ink-soft:#7d4c40; --blue:#3a36e0; --mint:#c9f7f0;
+  --fg:var(--cream); --muted:#ffdccf; --line:rgba(255,245,225,.35); --label:var(--yellow);
+  --font-body:"Mulish",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-logo:"Yellowtail","Snell Roundhand","Brush Script MT",cursive;
+  --radius:26px; color-scheme:light;
+}
+*{box-sizing:border-box}
+html{background:var(--blob-a)}
+body{margin:0;background:var(--blob-a);color:var(--ink);font:15px/1.5 var(--font-body);padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0 100px;min-height:100vh}
+[hidden]{display:none!important}
+img{max-width:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top, 0px);background:var(--field);z-index:30}
+body::after{content:"";position:fixed;z-index:-1;right:-22vmin;top:-8vmin;width:95vmin;height:95vmin;border-radius:46% 54% 41% 59%/55% 43% 57% 45%;background:var(--blob-b);pointer-events:none}
+h1,h2,h3,h4{font-family:var(--font-body);font-weight:800;line-height:1.2;margin:0;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.screen{max-width:760px;margin:clamp(8px,3vw,28px) auto 0;background:var(--field);color:var(--fg);border-radius:34px;overflow:clip;min-height:70vh}
+.wrap{display:flex;flex-direction:column;gap:20px;padding:20px clamp(14px,3vw,24px) 30px}
+header.top{position:sticky;top:env(safe-area-inset-top, 0px);z-index:20;background:var(--field);padding:16px clamp(14px,3vw,24px) 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand b{font-family:var(--font-logo);font-weight:400;font-size:38px;line-height:1;color:var(--yellow);letter-spacing:.01em}
+.brand span{color:var(--yellow);font-size:14px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+nav.tabs{display:flex;gap:6px;margin-top:10px;overflow-x:auto;padding-bottom:2px}
+nav.tabs button{background:none;border:0;border-bottom:4px solid transparent;padding:8px 10px 6px;color:var(--cream);font-weight:800;font-size:16px;opacity:.85}
+nav.tabs button[aria-current="true"]{color:var(--yellow);border-color:var(--yellow);opacity:1}
+.panel{--fg:var(--ink);--muted:var(--ink-soft);--line:#ecd5bf;--label:var(--blue);background:var(--cream);color:var(--ink);border-radius:var(--radius);padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel.hl{background:var(--yellow);--line:rgba(59,19,12,.2)}
+.panel.flat{background:none;border-radius:0;padding:0;--fg:var(--cream);--muted:var(--muted);color:var(--cream);--label:var(--yellow)}
+.stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-width:0}
+.between{justify-content:space-between}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--label);font-weight:800}
+.btn{background:var(--yellow);color:var(--ink);border:2px solid var(--ink);border-radius:99px;padding:8px 18px;font-weight:800}
+.panel .btn{background:var(--cream);border-color:var(--ink)}
+.panel.hl .btn{background:var(--cream)}
+.btn.primary,.panel .btn.primary{background:var(--field);color:var(--cream);border-color:var(--field)}
+.btn.ghost,.panel .btn.ghost{background:none;border-color:transparent;text-decoration:underline;text-underline-offset:3px}
+.screen>.wrap>.btn.ghost{color:var(--cream)}
+.btn.danger{color:#b3150f}
+.btn.sm{padding:5px 13px;font-size:13px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+input[type=text],input[type=search],textarea,select{width:100%;font:inherit;color:var(--ink);background:#fff;border:2px solid var(--ink);border-radius:16px;padding:10px 13px}
+input[type=checkbox]{accent-color:var(--field);width:18px;height:18px}
+textarea{min-height:88px;resize:vertical}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:3px 12px;font-size:12.5px;font-weight:800;background:var(--mint);color:var(--ink);white-space:nowrap}
+.chip.ok{background:var(--mint);color:#0d5b43}
+.chip.warn{background:var(--yellow);color:#6a3200}
+.chip.acc{background:var(--blue);color:#fff;border-radius:6px}
+.monthbar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.monthbar h1{font-size:clamp(24px,6vw,32px);text-align:center;flex:1;color:var(--yellow);padding-bottom:4px;border-bottom:4px solid var(--yellow)}
+.hw{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.hw li{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:9px 0;border-top:2px solid var(--line)}
+.hw li:first-child{border-top:0}
+.row4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.slot{display:flex;flex-direction:column;gap:6px;background:none;border:0;padding:0;text-align:left;min-width:0;color:inherit}
+.slot .pos{display:flex;gap:6px;align-items:flex-start;font-size:12px;line-height:1.25;color:var(--ink);font-weight:800;min-height:30px}
+.slot .pos b{flex:none;width:19px;height:19px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-size:11px}
+.art{display:block;aspect-ratio:300/527;border-radius:20px;overflow:hidden;background:var(--mint);border:2px solid var(--ink)}
+.art img{width:100%;height:100%;object-fit:cover;display:block}
+.art img.rev{transform:rotate(180deg)}
+.art.back{background:repeating-linear-gradient(135deg,var(--field) 0 7px,var(--yellow) 7px 14px)}
+.art.empty{border-style:dashed;background:none;display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center;padding:4px}
+.nm{font-size:12.5px;line-height:1.25;font-weight:800;min-width:0;overflow-wrap:anywhere}
+.nm em{display:block;font-style:normal;font-weight:600;color:#a33a00;font-size:11.5px}
+.slotbtns{display:flex;flex-direction:column;gap:5px}
+.quote{border-left:5px solid var(--field);padding:2px 0 2px 12px;white-space:pre-wrap;overflow-wrap:anywhere;font-weight:600}
+.notice{border-radius:18px;padding:12px 14px;background:var(--yellow);color:var(--ink);font-size:14px}
+.panel.hl .notice{background:var(--cream)}
+.notice.stop{background:var(--blue);color:#fff}
+.note{border-top:2px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:7px}
+.note p{white-space:pre-wrap;overflow-wrap:anywhere}
+.weet{background:var(--mint);border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:8px;--label:var(--blue)}
+.weet ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:12px}
+.thumb{background:none;border:0;padding:0;display:flex;flex-direction:column;gap:6px;text-align:left;min-width:0;color:var(--cream)}
+.thumb .art{border-color:var(--cream)}
+.filters{display:flex;gap:7px;flex-wrap:wrap}
+.filters button{border:2px solid var(--cream);background:none;color:var(--cream);border-radius:99px;padding:5px 14px;font-size:13px;font-weight:800}
+.filters button[aria-pressed="true"]{background:var(--yellow);color:var(--ink);border-color:var(--yellow)}
+.screen input[type=search]{border-color:var(--cream)}
+details{--fg:var(--ink);--muted:var(--ink-soft);--line:#ecd5bf;background:var(--cream);color:var(--ink);border-radius:var(--radius);padding:0 18px}
+details>summary{cursor:pointer;padding:16px 0;font-weight:800;font-size:16px}
+details[open]>summary{border-bottom:2px solid var(--line);margin-bottom:12px}
+details .body{padding-bottom:18px;display:flex;flex-direction:column;gap:10px}
+details ul,details ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+table.t{border-collapse:collapse;width:100%;font-size:14px}
+table.t th,table.t td{border-top:2px solid var(--line);padding:7px 8px 7px 0;text-align:left;vertical-align:top}
+.scroll{overflow-x:auto}
+#sheet{position:fixed;inset:0;z-index:50;background:rgba(59,19,12,.55);display:flex;justify-content:center;align-items:flex-end;padding-top:env(safe-area-inset-top, 0px)}
+.sheetbox{--fg:var(--ink);--muted:var(--ink-soft);--line:#ecd5bf;--label:var(--blue);background:var(--cream);color:var(--ink);width:100%;max-width:640px;max-height:92%;overflow:auto;border-radius:30px 30px 0 0;padding:20px max(16px, env(safe-area-inset-left, 0px)) calc(26px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));display:flex;flex-direction:column;gap:14px}
+.cardhead{display:flex;gap:14px;align-items:flex-start}
+.cardhead .art{width:116px;flex:none}
+.pick{display:flex;flex-direction:column;gap:2px}
+.pickrow{display:flex;gap:12px;align-items:center;background:none;border:0;border-bottom:2px solid var(--line);padding:7px 0;text-align:left;width:100%;color:inherit}
+.pickrow .art{width:36px;flex:none;border-radius:8px}
+#player{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--blue);color:#fff;padding:10px max(16px, env(safe-area-inset-left, 0px)) calc(10px + env(safe-area-inset-bottom, 0px));display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#player audio{flex:1;min-width:180px;max-width:100%}
+#player .btn{background:var(--yellow);border-color:var(--yellow)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom, 0px));z-index:60;background:var(--blue);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;font-weight:800;max-width:90%}
+.filebtn{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.filebtn input{position:absolute;opacity:0;width:1px;height:1px}
+.filebtn:focus-within{outline:3px solid var(--blue);outline-offset:2px}
+@media (max-width:420px){.slot .pos span{font-size:11px}.nm{font-size:11.5px}.brand b{font-size:34px}}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+
+<div id="app"><div class="wrap"><p class="muted">Maanlegging wordt geladen…</p></div></div>
+<div id="sheet" hidden></div>
+<div id="player" hidden><span id="pl-label" class="small"></span><audio id="pl-audio" controls preload="none"></audio><button type="button" class="btn sm ghost" data-act="player-close">Sluit</button></div>
+<div id="toast" hidden></div>
+
+<script>
+/* [id, nl, en, rechtop, omgekeerd, [[beeld, betekenis]...], astro] — id: m00-m21, w/c/s/p 01-14 (11 page, 12 ridder, 13 koningin, 14 koning) */
+const CARD_ROWS = [
+["m00","De Dwaas","The Fool","Nieuw begin, onbevangenheid, een sprong in het onbekende.","Roekeloosheid, twijfel vlak voor de sprong, naïef risico nemen.",[["Klif","Je staat aan de rand van het bekende en staat op het punt iets nieuws te betreden."],["Witte hond","Instinct dat vrolijk waarschuwt: luister naar je gevoel, maar blijf lopen."],["Witte roos","Zuivere wens en onschuld; je neemt geen last mee, alleen een bundeltje."]],"Lucht · Uranus"],
+["m01","De Magiër","The Magician","Wilskracht, vaardigheid, alle middelen liggen binnen handbereik.","Manipulatie, onbenut talent, mooie praatjes zonder inhoud.",[["Liggende acht boven het hoofd","Onbegrensde mogelijkheden en bewuste aandacht."],["Staf, beker, zwaard en pentakel op tafel","Je beschikt over alle vier de elementen: vuur, water, lucht en aarde."],["Eén hand omhoog, één omlaag","Wat boven is, is ook beneden: een idee omzetten in een daad."]],"Mercurius"],
+["m02","De Hogepriesteres","The High Priestess","Intuïtie, verborgen kennis, stilte voordat antwoorden komen.","Een genegeerde innerlijke stem, geheimen, oppervlakkigheid.",[["Zwarte en witte pilaar","Twee tegenstellingen waartussen je de poort naar het onbekende vindt."],["Sluier met granaatappels","Vruchtbaarheid en het verborgene; wat achter de sluier zit, krijg je niet cadeau."],["Maansikkel aan haar voeten","Intuïtie en cycli; je weet iets zonder te kunnen zeggen waarom."]],"Maan"],
+["m03","De Keizerin","The Empress","Overvloed, zorg, creativiteit, groei.","Overbezorgdheid, afhankelijkheid, een creatieve blokkade.",[["Rijp korenveld","Oogst en vruchtbaarheid: wat je zaaide, komt op."],["Hartvormig schild met Venusteken","Liefde, zinnelijkheid en het lichaam als bron van wijsheid."],["Kroon van twaalf sterren","Zij heerst over de kring van het jaar, over twaalf maanden en seizoenen."]],"Venus"],
+["m04","De Keizer","The Emperor","Structuur, gezag, stabiliteit, bescherming.","Starheid, dwang, controledrang, of juist gebrek aan leiding.",[["Troon met ramskoppen","Ram, Mars en vuur: wil en initiatief."],["Rode mantel onder harnas","Passie die onder controle is gebracht."],["Kale bergen achter hem","Hard, onbuigzaam terrein: stevigheid, maar weinig zachtheid."]],"Vuur · Ram"],
+["m05","De Hogepriester","The Hierophant","Traditie, begeleiding, gedeelde waarden, leren van een leermeester.","Dogma, tegendraads zijn om het tegendraads zijn, regels die niet meer passen.",[["Twee volgelingen aan zijn voeten","Kennis wordt doorgegeven; je leert van wie het al weet."],["Gekruiste sleutels","Toegang tot kennis, aards en hemels."],["Drievoudig kruis op zijn staf","Drie lagen: lichaam, ziel en geest."]],"Aarde · Stier"],
+["m06","De Geliefden","The Lovers","Keuze uit het hart, verbinding, waarden op één lijn.","Onbalans, twijfel, een uitgestelde keuze, wrijving.",[["Engel boven het paar","Zegen en een hogere liefde: de keuze krijgt betekenis."],["Boom met slang en boom met vlammen","Verleiding en passie; kennis en verlangen horen bij elkaar."],["Hij kijkt naar haar, zij naar de engel","Waar je naar kijkt, bepaalt wat je kiest."]],"Lucht · Tweelingen"],
+["m07","De Zegewagen","The Chariot","Vastberadenheid, overwinning door focus, richting.","Gebrek aan richting, agressie, de controle kwijt.",[["Zwarte en witte sfinx","Tegengestelde krachten die je onder één wil moet brengen."],["Sterrenbaldakijn","Hemelse steun voor wie weet waar hij heen wil."],["Geen teugels in zijn handen","Wilskracht stuurt, niet geweld."]],"Water · Kreeft"],
+["m08","Kracht","Strength","Zachte kracht, moed, mildheid die temt.","Zelftwijfel, ruwe kracht, opgekropte emotie.",[["Liggende acht boven haar hoofd","Innerlijke kracht en onbegrensde wil."],["Leeuw die zich laat aaien","Instinct wordt getemd door zachtheid, niet door dwang."],["Witte jurk en bloemenkrans","Zuivere bedoeling."]],"Vuur · Leeuw"],
+["m09","De Kluizenaar","The Hermit","Introspectie, wijsheid, bewust alleen zijn.","Isolatie, terugtrekken uit angst, advies lang negeren.",[["Lantaarn met zespuntige ster","Een klein licht voor de volgende stap, niet voor de hele weg."],["Staf","De steun van ervaring."],["Besneeuwde bergtop","Eenzaam gezichtspunt met overzicht."]],"Aarde · Maagd"],
+["m10","Rad van Fortuin","Wheel of Fortune","Keerpunt, cycli, geluk dat draait.","Tegenslag, weerstand tegen verandering, herhaling.",[["Vier gevleugelde wezens in de hoeken","Stier, leeuw, adelaar en mens: de vier vaste krachten die het lot bewaken."],["Slang omlaag, Anubis omhoog","Wat zakt, stijgt weer; het rad draait."],["Letters T-A-R-O en ROTA op het rad","Rota is rad: alles keert terug in een andere vorm."]],"Vuur · Jupiter"],
+["m11","Gerechtigheid","Justice","Eerlijkheid, oorzaak en gevolg, helder oordeel.","Oneerlijkheid, verantwoordelijkheid ontwijken, vooroordeel.",[["Zwaard omhoog","Helder denken en een beslissing die snijdt."],["Weegschaal","Afwegen: elke daad heeft een gevolg."],["Kroon en rode mantel","Gezag dat uit overtuiging komt."]],"Lucht · Weegschaal"],
+["m12","De Gehangene","The Hanged Man","Loslaten, ander perspectief, vrijwillige pauze.","Stilstand, offer zonder doel, vastklampen.",[["Aureool rond het hoofd","Inzicht door overgave."],["Rustig gezicht, één been gekruist","Het is vrijwillig, geen straf."],["Levende boom in T-vorm","Groei vanuit stilstand."]],"Water · Neptunus"],
+["m13","De Dood","Death","Afsluiting, transformatie, iets moet eindigen.","Verzet tegen verandering, vastzitten tussen oud en nieuw.",[["Skelet in zwart harnas op wit paard","De onvermijdelijke, eerlijke ruiter; hij kiest niemand uit."],["Witte roos op de vlag","Zuivere wedergeboorte."],["Zon die tussen twee torens opkomt","Een nieuwe dag na het einde."]],"Water · Schorpioen"],
+["m14","Gematigdheid","Temperance","Balans, geduld, de juiste mengverhouding.","Onevenwicht, overdaad, haast.",[["Water tussen twee bekers","Gevoel en gedachte, in stroming gehouden."],["Eén voet in het water, één op het land","Een brug tussen onderbewust en bewust."],["Pad naar een kroon aan de horizon","Een lange weg naar voltooiing."]],"Vuur · Boogschutter"],
+["m15","De Duivel","The Devil","Gebondenheid, verleiding, schaduwkant, gewoontes.","Loskomen, de ketens zien, afhankelijkheid verbreken.",[["Losse kettingen om hun nek","De ketens zitten niet vast: je kunt eruit."],["Omgekeerd pentagram","Materie boven geest."],["Staarten met vruchten en vlam","Verlangen, zinnelijkheid en dorst."]],"Aarde · Steenbok"],
+["m16","De Toren","The Tower","Plotselinge omwenteling, valse zekerheid stort in.","Een ramp ontwijken, verandering uitstellen, de nasleep.",[["Bliksem","Plotseling inzicht of schok."],["Kroon die eraf vliegt","Oude gedachten en trots vallen weg."],["Vallende figuren","Loslaten wat je dacht te beheersen."]],"Vuur · Mars"],
+["m17","De Ster","The Star","Hoop, genezing, vertrouwen na de storm.","Ontmoediging, vertrouwen kwijt, een slapende hoop.",[["Acht sterren, één grote","Hoop en leiding."],["Water in de vijver en op het land","Geven aan gevoel én aan de aarde."],["Ibis in de boom","De vogel van Thoth: wijsheid die je rustig toekijkt."]],"Lucht · Waterman"],
+["m18","De Maan","The Moon","Illusie, onderbewuste, angst en dromen.","Verwarring trekt weg, angst loslaten, verdrongen gevoel.",[["Hond en wolf huilen naar de maan","Het tamme en het wilde in onszelf."],["Kreeft kruipt uit het water","Een oude, diepe emotie komt boven."],["Pad tussen twee torens","Je gaat door onzekerheid heen, niet eromheen."]],"Water · Vissen"],
+["m19","De Zon","The Sun","Vreugde, helderheid, succes, vitaliteit.","Tijdelijke bewolking, overdreven optimisme.",[["Kind op een wit paard","Onbevangenheid en vertrouwen."],["Zonnebloemen","Groeien naar het licht."],["Rode banier","Levenskracht."]],"Zon"],
+["m20","Het Oordeel","Judgement","Roeping, afrekening met het verleden, een nieuwe fase.","Zelfkritiek, de roep negeren, niet kunnen vergeven.",[["Engel met trompet","Een oproep om op te staan."],["Figuren die uit kisten opstaan","Het verleden wordt vrijgemaakt en vernieuwd."],["Bergen en golf","Een grote, onvermijdelijke kracht."]],"Vuur · Pluto"],
+["m21","De Wereld","The World","Voltooiing, integratie, rond zijn met een fase.","Bijna klaar, onaf blijven, afronding uitstellen.",[["Lauwerkrans","Overwinning; de cyclus is rond."],["Vier figuren in de hoeken","De vier elementen in balans."],["Danser met twee staven","Beweging; evenwicht tussen nemen en geven."]],"Aarde · Saturnus"],
+
+["w01","Aas van Staven","Ace of Wands","Een vonk, nieuwe drive, kans om te beginnen.","Vertraagde start, bevlogenheid zonder richting.",[["Hand uit een wolk met staf","Een gave van buitenaf: de vonk."],["Groene blaadjes aan de staf","Het leeft nog en groeit."]]],
+["w02","Twee van Staven","Two of Wands","Plannen maken, kiezen tussen blijven en gaan.","Angst voor het onbekende, plannen blijven in het hoofd.",[["Man met wereldbol op de muur","Je overziet je mogelijkheden."],["Eén staf in zijn hand, één vastgezet","Je houdt jezelf al vast; de keuze moet nog."]]],
+["w03","Drie van Staven","Three of Wands","Vooruitkijken, uitbreiding, wachten op de oogst.","Tegenslag in plannen, te weinig overzicht.",[["Man kijkt vanaf klif naar schepen","Je plannen zijn onderweg."],["Drie staven in de grond","Het fundament staat."]]],
+["w04","Vier van Staven","Four of Wands","Feest, thuiskomst, mijlpaal.","Onrust thuis, een uitgestelde viering.",[["Bloemslingers tussen de staven","Vreugde en gemeenschap."],["Kasteel op de achtergrond","Een veilige basis."]]],
+["w05","Vijf van Staven","Five of Wands","Strijd, botsende meningen, speelse competitie.","Conflict vermijden, uitputtende ruzie.",[["Vijf figuren zwaaien door elkaar","Veel stemmen, geen leiding."],["Geen echte klappen","Een oefenwedstrijd, geen oorlog."]]],
+["w06","Zes van Staven","Six of Wands","Overwinning, erkenning, publiek succes.","Valse trots, uitblijvende erkenning.",[["Lauwerkrans op de staf","Zege."],["Ruiter tussen volgelingen te voet","Leiderschap steunt op anderen."]]],
+["w07","Zeven van Staven","Seven of Wands","Je positie verdedigen, standvastigheid.","Overweldigd, opgeven onder druk.",[["Man op heuvel tegen staven van onderen","Hij heeft het hogere standpunt."],["Twee verschillende schoenen","Haastig en onvoorbereid, maar hij blijft staan."]]],
+["w08","Acht van Staven","Eight of Wands","Snelheid, nieuws, beweging komt eraan.","Vertraging, haast zonder resultaat.",[["Acht staven door de lucht","Berichten en acties zijn onderweg."],["Open, rustig landschap","Geen obstakels op de route."]]],
+["w09","Negen van Staven","Nine of Wands","Gewond maar standvastig, nog één stuk te gaan.","Uitputting, achterdocht, volharden zonder reden.",[["Verband om het hoofd","Eerdere strijd laat sporen na."],["Rij staven als hek achter hem","Waakzaamheid; je hebt een muur gebouwd."]]],
+["w10","Tien van Staven","Ten of Wands","Overbelasting, te veel dragen.","Taken afgeven, last loslaten.",[["Man gebogen onder tien staven","Alles zelf willen dragen."],["Dorp in zicht","De bestemming is dichtbij."]]],
+["w11","Page van Staven","Page of Wands","Enthousiasme, nieuws, ontdekkingsdrang.","Ongeduld, halve plannen, slecht nieuws.",[["Staf met ontkiemende blaadjes","Een idee dat nog moet groeien."],["Tuniek met salamanders","Vuur en transformatie."]]],
+["w12","Ridder van Staven","Knight of Wands","Gedreven actie, avontuur, energie.","Impulsiviteit, haast, uitputting.",[["Steigerend paard","Vaart en onrust."],["Woestijn","Een weids vuurelement."]]],
+["w13","Koningin van Staven","Queen of Wands","Warmte, charisma, zelfverzekerdheid.","Jaloezie, dominantie, uitgebluste warmte.",[["Zonnebloem in haar hand","Vitaliteit."],["Zwarte kat bij haar voeten","Intuïtie en onafhankelijkheid."]]],
+["w14","Koning van Staven","King of Wands","Visie, leiderschap, durf.","Heerszucht, ongeduldig leiderschap.",[["Salamander op troon en mantel","Beheersing van het vuur."],["Staf met jonge blaadjes","Een visie die levend blijft."]]],
+
+["c01","Aas van Bekers","Ace of Cups","Nieuw gevoel, liefde, emotionele overvloed.","Geblokkeerd gevoel, emotionele leegte.",[["Beker met vijf waterstralen","Overvloed die over de rand loopt."],["Duif met hostie","Vrede en zegen."],["Waterlelies","Zuiverheid en rust."]]],
+["c02","Twee van Bekers","Two of Cups","Wederzijdse liefde, verbinding, gelijkwaardigheid.","Onbalans, breuk, ongelijke inzet.",[["Twee mensen wisselen bekers","Geven en ontvangen."],["Leeuwenkop met vleugels boven hen","Passie én genezing in het bondgenootschap."]]],
+["c03","Drie van Bekers","Three of Cups","Vriendschap, vieren, gemeenschap.","Roddel, uitsluiting, overmatig feesten.",[["Drie vrouwen heffen bekers","Steun en vreugde."],["Vruchten op de grond","Oogst en overvloed."]]],
+["c04","Vier van Bekers","Four of Cups","Verveling, innerlijke afstand, overpeinzing.","Nieuwe motivatie, een aanbod eindelijk zien.",[["Man met gekruiste armen onder een boom","Afgesloten voor wat hem wordt aangeboden."],["Beker uit een wolk","Een kans die hij nog niet ziet."]]],
+["c05","Vijf van Bekers","Five of Cups","Verlies, rouw, blijven staren naar wat weg is.","Acceptatie, doorgaan, de resterende bekers zien.",[["Drie omgevallen bekers","Wat verloren is."],["Twee bekers die nog rechtop staan","Wat er nog wel is."],["Brug en huis in de verte","De weg naar herstel."]]],
+["c06","Zes van Bekers","Six of Cups","Nostalgie, kindertijd, onschuldige vriendelijkheid.","Vastzitten in het verleden, te naïef.",[["Kinderen geven bloemen in bekers","Een zuivere gift."],["Oud dorp","Vertrouwde omgeving."]]],
+["c07","Zeven van Bekers","Seven of Cups","Dromen, keuzes, illusies.","Helderheid, kiezen, wensdenken doorprikken.",[["Zeven bekers in wolken","Fantasieën waaruit je er één moet kiezen."],["Silhouet voor de wolken","Jij, tegenover de verleiding."]]],
+["c08","Acht van Bekers","Eight of Cups","Weglopen uit teleurstelling, zoeken naar meer.","Terugkeren, blijven hangen in wat tekortschiet.",[["Man loopt weg bij gestapelde bekers","Bewust loslaten wat niet meer vult."],["Maan boven de bergen","Een innerlijke reis."]]],
+["c09","Negen van Bekers","Nine of Cups","Voldoening, wens vervuld, genieten.","Hebzucht, schijnvertoon, leegte achter succes.",[["Man met gekruiste armen voor negen bekers","Tevredenheid."],["Bekers in een boog achter hem","Geluk dat tentoon wordt gesteld."]]],
+["c10","Tien van Bekers","Ten of Cups","Gezinsgeluk, vervulling, harmonie.","Verstoorde harmonie, ideaalbeeld onder druk.",[["Regenboog van tien bekers","Vervulling van het hart."],["Gezin dat danst","Thuis voelt als thuis."]]],
+["c11","Page van Bekers","Page of Cups","Gevoelig nieuws, creatieve boodschap, zachtheid.","Emotionele onrijpheid, creatieve blokkade.",[["Vis springt uit de beker","Een verrassing uit het onderbewuste."],["Blauwe tuniek met lotussen","Water en rust."]]],
+["c12","Ridder van Bekers","Knight of Cups","Romantisch aanbod, het hart volgen.","Gladde praatjes, humeurigheid, onbetrouwbare charme.",[["Rustig stappend paard","Voorzichtig en gevoelig."],["Vleugels op helm en schoenen","Fantasie en boodschapper."]]],
+["c13","Koningin van Bekers","Queen of Cups","Empathie, intuïtie, zorgzaamheid.","Overgevoeligheid, afhankelijkheid, overspoeld door emotie.",[["Gesloten beker met kruis","Intuïtie met diepte."],["Troon aan het water","Geworteld in gevoel."]]],
+["c14","Koning van Bekers","King of Cups","Emotionele rijpheid, kalme leiding.","Emotionele manipulatie, onderdrukte gevoelens.",[["Troon drijft op water","Rust midden in beweging."],["Schip en visamulet","Gevoel en gezag in balans."]]],
+
+["s01","Aas van Zwaarden","Ace of Swords","Heldere waarheid, doorbraak in het denken.","Verwarring, harde woorden, botte wil.",[["Zwaard met kroon en lauwer","De overwinning van de geest."],["Rotsachtige bergen","Scherpe, harde helderheid."]]],
+["s02","Twee van Zwaarden","Two of Swords","Patstelling, een keuze vermijden, blinde vlek.","Geen keuze meer te ontwijken, informatie komt boven.",[["Blinddoek","Zelf niet willen zien."],["Gekruiste zwaarden voor de borst","Verdedigend."],["Zee en maansikkel","Gevoel op afstand."]]],
+["s03","Drie van Zwaarden","Three of Swords","Hartzeer, een pijnlijke waarheid.","Herstel, vergeving, verdriet doorwerken.",[["Hart doorboord door drie zwaarden","Scherpe pijn."],["Regen en wolken","Rouw die er mag zijn."]]],
+["s04","Vier van Zwaarden","Four of Swords","Rust, herstel, tijdelijke pauze.","Onrust, opnieuw beginnen, burn-out dreigt.",[["Liggende ridder in de kerk","Rust en gebed."],["Drie zwaarden aan de muur, één eronder","Gedachten klaargezet."]]],
+["s05","Vijf van Zwaarden","Five of Swords","Winnen ten koste van anderen, hol succes.","Berouw, verzoening, spijt.",[["Man houdt de zwaarden, anderen lopen weg","Wie wint, staat alleen."],["Stormachtige lucht","Dreigende nasleep."]]],
+["s06","Zes van Zwaarden","Six of Swords","Overgang, rustiger water, een last die meegaat.","Niet kunnen vertrekken, moeilijkheden volgen.",[["Veerman vaart mensen naar de overkant","Een begeleide reis."],["Zwaarden in de boot","Zorgen reizen mee, maar het water voor je is kalm."]]],
+["s07","Zeven van Zwaarden","Seven of Swords","Sluwheid, strategie, stiekem handelen.","Bekentenis, betrapt worden, laten uitkomen.",[["Man sluipt weg met vijf zwaarden","Stiekeme winst."],["Twee zwaarden blijven staan","Onvolledig plan."]]],
+["s08","Acht van Zwaarden","Eight of Swords","Jezelf beperken, het gevoel gevangen te zitten.","Bevrijding, de weg zien, eigen angst herkennen.",[["Vrouw geblinddoekt en vastgebonden","Door eigen denken gevangen."],["Losse banden en open pad","De uitweg is dichterbij dan je denkt."]]],
+["s09","Negen van Zwaarden","Nine of Swords","Nachtelijke zorgen, angst, piekeren.","Opluchting, hulp zoeken, zorgen blijken kleiner.",[["Zittend in bed, handen voor het gezicht","Zorgen in het donker."],["Deken met rozen en sterren","Steun die nog bij je ligt."]]],
+["s10","Tien van Zwaarden","Ten of Swords","Het einde van een zware periode, dieptepunt.","Herstel begint, overdrijving, een einde dat lang duurt.",[["Tien zwaarden in de rug","Het ergste is voorbij."],["Zonsopgang aan de horizon","Een nieuw begin na het zwart."]]],
+["s11","Page van Zwaarden","Page of Swords","Nieuwsgierigheid, scherp denken, alertheid.","Roddel, scherpe tong, onderbuikreactie.",[["Zwaard met twee handen omhoog","Klaar om te leren."],["Wind in de haren","De geest in beweging."]]],
+["s12","Ridder van Zwaarden","Knight of Swords","Snelle actie, directe waarheid, ambitie.","Impulsief, ruw, haastige conclusies.",[["Galopperend paard in storm","Vaart zonder tijd om te kijken."],["Zwaard hoog omhoog","Vastberaden."]]],
+["s13","Koningin van Zwaarden","Queen of Swords","Heldere blik, onafhankelijkheid, eerlijkheid.","Kilte, bitterheid, scherp oordeel.",[["Opgeheven zwaard, open hand","Recht doen met begrip."],["Vlinders op de troon","Ontwikkeling van de geest."]]],
+["s14","Koning van Zwaarden","King of Swords","Intellectueel gezag, objectiviteit, logica.","Machtsmisbruik, koude beslissingen.",[["Zwaard rechtop","Recht en helderheid."],["Lucht met vogels","Verheven overzicht."]]],
+
+["p01","Aas van Pentakels","Ace of Pentacles","Nieuwe kans, zaadje van welvaart.","Gemiste kans, slechte investering.",[["Hand met pentakel uit een wolk","Een kans wordt aangeboden."],["Tuinboog met leliën","Veilige toegang tot iets moois."]]],
+["p02","Twee van Pentakels","Two of Pentacles","Balans, schakelen tussen prioriteiten.","Chaos, overspoeld door taken.",[["Jongleur met liggende acht","Voortdurend in beweging."],["Golven achter hem","Onstabiele omstandigheden."]]],
+["p03","Drie van Pentakels","Three of Pentacles","Samenwerking, vakmanschap, teamwerk.","Slechte afstemming, middelmatig werk.",[["Ambachtsman in kerkboog met twee anderen","Vak en visie komen samen."],["Pentakels in de boog","Werk dat blijft."]]],
+["p04","Vier van Pentakels","Four of Pentacles","Vasthouden, zekerheid, grenzen.","Loslaten, geld dat weer stroomt.",[["Pentakels op hoofd, borst en onder de voeten","Alles stevig vastgehouden."],["Stad op de achtergrond","Afstand tot anderen."]]],
+["p05","Vijf van Pentakels","Five of Pentacles","Armoede, buitengesloten voelen, tijdelijk gebrek.","Herstel, hulp, einde van de nood.",[["Twee mensen in de sneeuw langs een gebrandschilderd raam","Hulp is dichtbij."],["Kruk","Kwetsbaarheid."]]],
+["p06","Zes van Pentakels","Six of Pentacles","Geven en ontvangen, gulheid, eerlijke ruil.","Schuld, ongelijke ruil, afhankelijkheid.",[["Koopman met weegschaal","Balans in geven."],["Twee bedelaars knielen","Ontvangen mag."]]],
+["p07","Zeven van Pentakels","Seven of Pentacles","Geduld, de oogst beoordelen.","Ongeduld, tegenvallend resultaat.",[["Man leunt op schoffel bij struik met pentakels","Pauze en overzicht."],["Rijpend fruit","Groei kost tijd."]]],
+["p08","Acht van Pentakels","Eight of Pentacles","Oefenen, toewijding, precisiewerk.","Slordig werk, perfectionisme zonder voortgang.",[["Ambachtsman slaat pentakels in een rij","Herhaling leidt tot meesterschap."],["Stad in de verte","Nog afstand tot de wereld."]]],
+["p09","Negen van Pentakels","Nine of Pentacles","Zelfstandigheid, genieten van eigen werk.","Afhankelijkheid, schijn van welvaart.",[["Vrouw in wijngaard met valk","Gedisciplineerd en beheerst."],["Slak","Een traag tempo is oké."]]],
+["p10","Tien van Pentakels","Ten of Pentacles","Erfenis, familie, de lange termijn.","Familieconflict, geldzorgen door de generaties heen.",[["Oude man, paar, kind en honden onder een poort","Drie generaties."],["Pentakels als sterrenbeeld","Een lange cyclus."]]],
+["p11","Page van Pentakels","Page of Pentacles","Studie, nieuwe ambitie, nuchtere nieuwsgierigheid.","Uitstelgedrag, onzorgvuldig met geld.",[["Page bestudeert het pentakel in zijn handen","Leergierig."],["Geploegd veld","Mogelijkheden wachten."]]],
+["p12","Ridder van Pentakels","Knight of Pentacles","Volharding, betrouwbaarheid, geduldig werken.","Verstarring, saaiheid, koppigheid.",[["Stilstaand paard","Voorzichtig tempo."],["Geploegde akker","Hard werken dat loont."]]],
+["p13","Koningin van Pentakels","Queen of Pentacles","Praktische zorg, zinnelijkheid, gulheid.","Overbezorgd, materialistisch, zelfverwaarlozing.",[["Konijn bij haar voeten","Vruchtbaarheid."],["Bloeiende tuin rond haar troon","Een huis dat groeit."]]],
+["p14","Koning van Pentakels","King of Pentacles","Welvaart, stabiliteit, gul bestuur.","Hebzucht, koppigheid, financieel risico.",[["Druiven op mantel en troon","Overvloed."],["Kasteel op de achtergrond","Bezit en zekerheid."]]]
+];
+
+/* Kernwoorden uit de cheatsheet van het werkboek, per kaart */
+const KW = {
+m00:["Onschuld","Naïef","Vertrouwen","Begin van een avontuur"],
+m01:["Creatie","Manifestatie","Magie","Potentieel"],
+m02:["Intuïtie","Spiritualiteit","Wijsheid","Verborgen kennis"],
+m03:["Vruchtbaarheid","Genot","Creativiteit","Zorgzaamheid"],
+m04:["Autoriteit","Stabiliteit","Structuur","Leiderschap"],
+m05:["Vergeving","Traditie","Medeleven","Gemeenschap"],
+m06:["(Zelf)liefde","Verbintenis","Harmonie"],
+m07:["Succes","Wilskracht","Zege vieren","Overwinning"],
+m08:["Kracht","Standvastig","Moed","Concentratie"],
+m09:["Introspectie","Afzondering","Kennis","Geduld"],
+m10:["Omwenteling","Lot","Geluk en kans","Winst"],
+m11:["Rechtvaardigheid","Eerlijkheid","Gelijkheid"],
+m12:["Nieuw perspectief","Offeren","Groei","Overgave"],
+m13:["Transformatie","Een einde zorgt voor een nieuw begin","Acceptatie"],
+m14:["Matigen","Balans","Harmonie","Overgang"],
+m15:["Misleiding","Verwoesting","Stilstand","Mateloosheid","Negativiteit"],
+m16:["Verandering","Openbaring","Val","Tegenspoed"],
+m17:["Inzicht","Bezieling","Vervulling","Hoop en heling","Nieuw perspectief"],
+m18:["Intuïtie","Illusie","Verdriet","Teleurstelling"],
+m19:["Geluk","Creativiteit","Positieve energie"],
+m20:["Oordeel","Transformatie","Vernieuwing","Bestemming"],
+m21:["Voltooiing","Vervulling","Vrijheid","Erkenning"],
+p01:["Nieuw begin","Creatie","Rijkdom","Hier en nu","Veiligheid"],
+p02:["Plezier","Leven is spelen","Reizen, een reis","Opstarten","Harmonie"],
+p03:["Samenwerken","Inventief","Meesterschap","Investeren"],
+p04:["Op je geld zitten","Niet willen delen","Voor jezelf houden"],
+p05:["Armoede","Ontbering","Materiële tegenslagen"],
+p06:["Overgave","Liefdadigheid","Delen van rijkdom"],
+p07:["Werken met liefde","Zorg en geduld"],
+p08:["Productiviteit","Doortastend","Ambacht","Snel lerend"],
+p09:["Overvloed in alle opzichten"],
+p10:["Rijkdom","Welvaart","Veiligheid","Familie","Welzijn"],
+p11:["Planning","Toewijding","Vindingrijkheid","Potentieel"],
+p12:["Betrouwbaar","Oprecht","Ambitieus","Harde werker"],
+p13:["Welstand","Zekerheid","Vrijheid","Rijk en genereus"],
+p14:["Overvloed","Bekwaam in zaken","Vervulling van talenten"],
+w01:["Nieuw begin","Creatie","Inspiratie","Initiatief","Vernieuwing"],
+w02:["Plannen maken","Groei","Succes","Actie"],
+w03:["Uitbreiding","Ondernemen","Handelen","Samenwerking","Vooruit kijken"],
+w04:["Op de goede weg zijn en dit vieren","Toenemende welvaart","Liefde","Harmonie"],
+w05:["Competitie","Conflicten en uitdagingen"],
+w06:["Succes","Overwinning en erkenning"],
+w07:["Voor jezelf opkomen","Je mening verdedigen"],
+w08:["Snelle actie","Snelle verandering en beweging"],
+w09:["Doorzettingsvermogen","Innerlijke kracht en voorbereiding"],
+w10:["Last","Verantwoordelijkheid","Het gevoel dat je overweldigd wordt"],
+w11:["Optimisme","Energie","Goed nieuws"],
+w12:["Passie","Avontuur","Initiatief","Rivaliteit"],
+w13:["Succes in zaken","Invloedrijk","Vriendelijk","Liefde en geld"],
+w14:["Leiderschap","Wijsheid","Zelfvertrouwen","Succes"],
+c01:["Nieuw begin","Creatie","Zinvolle ervaring","Fortuin"],
+c02:["Vriendschap","Harmonie","Samenwerking","Vergeving"],
+c03:["Viering","Oplossing van een probleem","Overvloed","Overwinning"],
+c04:["Uitstel","Besluiteloos","Weerstand","Overdenking"],
+c05:["Leed","Verdriet","Verlies","Spijt"],
+c06:["Onschuld","Herinneringen","Geluk","Karma"],
+c07:["Mogelijkheden","Fantasie","Succes wordt niet verder nagestreefd"],
+c08:["Loslaten","De rug toekeren","Op zoek naar geluk"],
+c09:["De prijzen zijn gewonnen","Voldoening","Dankbaarheid"],
+c10:["Harmonie","Geluk","Bevrijding","Liefde"],
+c11:["Creativiteit","Romantiek","Gevoelig","Loyaal"],
+c12:["Goede gevoelens","Schoonheid","Verliefd"],
+c13:["Verborgen wijsheid","Intuïtie","Openhartig"],
+c14:["Wijsheid","Idealisme","Zelfontdekking","Emotioneel stabiel"],
+s01:["Nieuw begin","Helderheid","Focus","Positiviteit","Potentie"],
+s02:["Verzoening","Ontkenning","Balans","Herstelde vrede"],
+s03:["Rouw","Verlies","Pijn","Lijden"],
+s04:["Rust","Bezinning","Terugtrekken","Herstel"],
+s05:["Conflict","Nederlaag","Strijd"],
+s06:["Verandering","Verdergaan","Vlucht"],
+s07:["Verraad","Buitenkans","Strategisch","Bedrog"],
+s08:["Zelfsabotage","Negatieve gedachten","Gevangen"],
+s09:["Zorgen","Wanhoop","Schuldgevoel","Lijden"],
+s10:["Einde","Keerpunt","Alles is voorbij"],
+s11:["Innerlijke groei","Onderzoekend","Nieuwsgierig","Alert","Waakzaam"],
+s12:["Moed","Gedrevenheid","Besluitvaardig","Voortvarend"],
+s13:["Groot verdriet","Eerlijk","Ontvankelijk","Fijngevoelig"],
+s14:["Autoriteit","Kracht","Intelligent","Rechtvaardig","Streng"]
+};
+/* De twee extra kaarten van het deck van 80: veiligheidskaarten */
+const SAFETY = [
+ {id:"x1",nl:"De Intuïtie",en:"Intuition",safety:true,
+  up:"Het antwoord weet je diep van binnen al. Deze kaart wijst je terug naar je eigen gevoel en vraagt je om je hart te volgen.",
+  rev:"Je innerlijke weten klopt niet bij wat je van buiten hoort. Luister eerst naar jezelf.",
+  cues:[["Vrouw die naar de hemel wijst en naar de aarde","Wat je voelt, is verbonden met wat je doet."],["Gouden lint om haar heen","Een draad die je terugbrengt naar je eigen weten."],["Pauw links onder","Ogen die alles zien: je intuïtie ziet meer dan je denkt."]],
+  kw:["Intuïtie","Jezelf volgen","Het antwoord zit al in jou"]},
+ {id:"x2",nl:"De Waarheid",en:"Truth",safety:true,
+  up:"De waarheid komt vanzelf boven tafel. Deze kaart vraagt je om eerlijk en realistisch naar jezelf te kijken en de verantwoordelijkheid te nemen.",
+  rev:"Je ontwijkt wat je al weet. Kijk ernaar, ook als het ongemakkelijk is.",
+  cues:[["Man met bliksemschichten in de lucht","Een heldere waarheid die plots licht geeft."],["Rood lint om zijn lijf","De draad van eerlijkheid die je niet kunt losknippen."],["Adelaar achter hem","Overzicht en scherpe blik."]],
+  kw:["Waarheid","Realisme","Verantwoordelijkheid nemen"]}
+];
+
+</script>
+<script>
+(function(){
+'use strict';
+
+/* ---------- vaste gegevens ---------- */
+const POS=[
+ {n:1,name:'Kernintentie',q:'Wat wil er in deze nieuwe maand geboren worden?',hint:'Waar gaat jouw maand om?'},
+ {n:2,name:'Belemmering',q:'Welke angst of belemmering mag ik onder ogen zien?',hint:'Wat houdt je tegen?'},
+ {n:3,name:'Kracht',q:'Wat geeft me de komende maand energie en inspiratie?',hint:'Waar haal je kracht uit?'},
+ {n:4,name:'Eerste stap',q:'Welke eerste stap kan ik nu zetten?',hint:'Wat ga je deze week doen?'}
+];
+const SUITS={
+ staven:{naam:'Staven',el:'vuur',werk:'doen',thema:'actie, wil, inspiratie en werk met passie'},
+ bekers:{naam:'Bekers',el:'water',werk:'voelen',thema:'gevoel, relaties, intuïtie en creativiteit'},
+ zwaarden:{naam:'Zwaarden',el:'lucht',werk:'denken',thema:'verstand, waarheid, communicatie en conflict'},
+ pentakels:{naam:'Pentakels',el:'aarde',werk:'maken',thema:'werk, geld, lichaam, huis en wat je kunt vasthouden'}
+};
+const NUMS={1:'een begin, een zaadje of kans',2:'een keuze, balans tussen twee dingen',3:'groei, samenwerking, een eerste resultaat',4:'stabiliteit en structuur, soms stilstand',5:'spanning, verlies of een uitdaging',6:'harmonie, overgang en herstel',7:'een toets, reflectie, geduld of illusie',8:'beweging, beheersing en vakmanschap',9:'bijna af, op eigen kracht, afronding',10:'voltooiing, overvloed of juist te veel'};
+const COURT={11:['Page','de boodschapper: leren, nieuws, een eerste stap'],12:['Ridder','de ondernemer: beweging en drijfveer, in de stijl van het element'],13:['Koningin','beheersing naar binnen: aanvoelen in dat element'],14:['Koning','beheersing naar buiten: gezag en leiding in dat element']};
+const SUITKEY={w:'staven',c:'bekers',s:'zwaarden',p:'pentakels'};
+const MAX_AUDIO=6*1024*1024, CHUNK=180000;
+
+/* ---------- kaartendeck (78 + 2 veiligheidskaarten = 80) ---------- */
+const BASE=CARD_ROWS.map(r=>{
+  const id=r[0], k=id[0];
+  return {id,nl:r[1],en:r[2],up:r[3],rev:r[4],cues:r[5],astro:r[6]||null,
+    suit:k==='m'?null:SUITKEY[k],n:+id.slice(1),arc:k==='m'?'groot':'klein',kw:KW[id]||[],img:'img/'+id+'.webp'};
+});
+const SAFE=SAFETY.map(s=>({id:s.id,nl:s.nl,en:s.en,up:s.up,rev:s.rev,cues:s.cues,astro:null,suit:null,n:0,arc:'veiligheid',safety:true,kw:s.kw,img:'img/'+s.id+'.webp'}));
+const ALL=BASE.concat(SAFE);
+const BYID={}; ALL.forEach(c=>BYID[c.id]=c);
+
+/* ---------- hulpfuncties ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
+const monthKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+const monthLabel=k=>{const [y,m]=k.split('-').map(Number);return cap(new Intl.DateTimeFormat('nl-NL',{month:'long',year:'numeric'}).format(new Date(y,m-1,1)))};
+const fmtTime=t=>new Intl.DateTimeFormat('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(t));
+const pad=n=>String(n).padStart(3,'0');
+function rndInt(n){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n}
+function rndBool(){return rndInt(2)===1}
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function drawDistinct(n,pool){const p=pool.slice(),out=[];while(out.length<n&&p.length){out.push(p.splice(rndInt(p.length),1)[0])}return out}
+function errMsg(e){const c=e&&e.code;if(c==='invalid_argument')return 'Opslaan lukt niet: je hebt hier geen schrijfrechten of de gegevens zijn ongeldig.';if(c==='quota_exceeded')return 'De opslag is vol.';if(c==='resource_exhausted')return 'Even rustig aan, probeer het zo opnieuw.';return (e&&e.message)||'Er ging iets mis.'}
+
+/* ---------- toestand ---------- */
+const S={db:null,user:null,uid:null,myName:'',canWrite:null,noDb:false,
+  ready:{members:false,spreads:false,notes:false},
+  members:[],months:{},spreads:{},notes:[],deckimg:{},
+  tab:'maand',month:monthKey(new Date()),filter:'alle',q:'',
+  draft:freshDraft(),redo:{},drafts:{},files:{},busy:{},sheet:null,confirm:null,toast:'',reversals:false};
+function freshDraft(){return {mode:'digital',rev:false,hidden:[],revealed:[],stopped:false}}
+
+/* ---------- afbeeldingen ---------- */
+function imgOf(c){const o=S.deckimg[c.id];if(o&&typeof o.img==='string'&&/^data:image\//.test(o.img))return o.img;return c.img}
+function artHtml(c,rev){return '<span class="art"><img class="'+(rev?'rev':'')+'" src="'+esc(imgOf(c))+'" alt="'+esc(c.nl)+'" loading="lazy"></span>'}
+function downscale(file,maxW){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file),im=new Image();
+    im.onload=()=>{const k=Math.min(1,maxW/im.width),cv=document.createElement('canvas');cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(url);let d=cv.toDataURL('image/webp',.85);if(!/^data:image\/webp/.test(d))d=cv.toDataURL('image/jpeg',.85);res(d)};
+    im.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('Afbeelding kon niet worden gelezen.'))};
+    im.src=url;
+  });
+}
+
+/* ---------- groep en rotatie ---------- */
+const members=()=>S.members;
+const memberOf=id=>S.members.find(m=>m.id===id);
+const nameOf=id=>{const m=memberOf(id);return m?m.name:'Iemand'};
+const me=()=>memberOf(S.uid);
+function rotation(key){const [y,m]=key.split('-').map(Number),ms=members();if(!ms.length)return null;return ms[(y*12+(m-1))%ms.length].id}
+const spotlightOf=key=>(S.months[key]&&S.months[key].spotlight)||rotation(key);
+const spreadId=(key,uid)=>key+'__'+uid;
+const spreadsOf=key=>Object.values(S.spreads).filter(s=>s.month===key);
+const notesOf=(sid,kind)=>S.notes.filter(n=>n.spread===sid&&n.kind===kind).sort((a,b)=>a.at-b.at);
+function monthsList(){const set=new Set([monthKey(new Date())]);Object.values(S.spreads).forEach(s=>set.add(s.month));return Array.from(set).sort()}
+
+/* ---------- weetjes over symboliek (drie per legging) ---------- */
+function weetjes(spread){
+  const cs=spread.cards.map(c=>({c:BYID[c.id],rev:c.rev})).filter(x=>x.c);
+  const rnd=mulberry(hash(spread.month+spread.uid)),out=[];
+  const minors=cs.filter(x=>x.c.suit);
+  if(minors.length){
+    const cnt={};minors.forEach(x=>cnt[x.c.suit]=(cnt[x.c.suit]||0)+1);
+    const top=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0],s=SUITS[top];
+    out.push({label:'Element',text:s.naam+' hoort bij '+s.el+' en gaat over '+s.thema+'. Onthoud het als werkwoord: '+s.naam.toLowerCase()+' = ik '+s.werk+'. In jouw legging komt dit '+cnt[top]+(cnt[top]===1?' keer':' keer')+' voor.'});
+  }else{
+    out.push({label:'Grote Arcana',text:'De grote arcana gaan over grote thema\'s in je leven. Staan ze (bijna) allemaal in je legging, dan zit je in een betekenisvol hoofdstuk, en gaat het minder om dagelijkse kleine dingen.'});
+  }
+  const withCue=cs.filter(x=>x.c.cues&&x.c.cues.length);
+  if(withCue.length){
+    const x=withCue[Math.floor(rnd()*withCue.length)],cue=x.c.cues[Math.floor(rnd()*x.c.cues.length)];
+    out.push({label:'Beeld',text:'Op '+x.c.nl+' zie je: '+cue[0].toLowerCase()+'. '+cue[1]});
+  }
+  const revCard=cs.find(x=>x.rev);
+  if(revCard){
+    out.push({label:'Omgekeerd',text:revCard.c.nl+' staat omgekeerd. Dat is niet automatisch slecht: de energie stroomt niet vrij, is naar binnen gericht of nog niet uitgesproken. Lees dan: '+revCard.c.rev.charAt(0).toLowerCase()+revCard.c.rev.slice(1)});
+  }else{
+    const numbered=minors.filter(x=>x.c.n>=1&&x.c.n<=14);
+    if(numbered.length){
+      const x=numbered[Math.floor(rnd()*numbered.length)];
+      if(x.c.n<=10)out.push({label:'Getal',text:'Een '+x.c.n+' staat voor '+NUMS[x.c.n]+'. Dat zie je terug op '+x.c.nl+'.'});
+      else out.push({label:'Hofkaart',text:'Een '+COURT[x.c.n][0]+' is '+COURT[x.c.n][1]+'. Zo lees je '+x.c.nl+'.'});
+    }else{
+      const m=cs.find(x=>x.c.astro)||cs[0];
+      if(m&&m.c.astro)out.push({label:'Verbinding',text:m.c.nl+' hoort bij '+m.c.astro.toLowerCase()+'. Elke grote kaart heeft zo een element en een planeet of dierenriemteken.'});
+    }
+  }
+  return out.slice(0,3);
+}
+
+/* ---------- audio ---------- */
+function readAsDataURL(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Bestand kon niet worden gelezen.'));r.readAsDataURL(file)})}
+function guessMime(f){if(f.type&&/^audio\//.test(f.type))return f.type;const e=(f.name.split('.').pop()||'').toLowerCase();return {m4a:'audio/mp4',mp4:'audio/mp4',mp3:'audio/mpeg',wav:'audio/wav',ogg:'audio/ogg',oga:'audio/ogg',webm:'audio/webm',aac:'audio/aac',opus:'audio/ogg'}[e]||'audio/mp4'}
+async function setWithRetry(ref,data){try{await ref.set(data)}catch(e){if(e&&e.code==='unavailable'){await new Promise(r=>setTimeout(r,600+Math.random()*600));await ref.set(data)}else throw e}}
+async function saveAudio(file,onProgress){
+  if(file.size>MAX_AUDIO)throw new Error('Dit bestand is te groot (maximaal 6 MB). Neem korter op of kies een kleiner formaat.');
+  const url=await readAsDataURL(file),b64=url.slice(url.indexOf(',')+1),id='a'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),parts=Math.ceil(b64.length/CHUNK);
+  for(let i=0;i<parts;i++){await setWithRetry(S.db.doc('audio/'+id+'/parts/'+pad(i)),{i,d:b64.slice(i*CHUNK,(i+1)*CHUNK)});onProgress(i+1,parts)}
+  return {id,mime:guessMime(file),parts,size:file.size};
+}
+const audioCache={};
+async function loadAudio(a){
+  if(audioCache[a.id])return audioCache[a.id];
+  const snap=await S.db.collection('audio/'+a.id+'/parts').orderBy('i').get();
+  const b64=snap.docs.map(d=>d.data().d).join('');
+  const bin=atob(b64),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+  const e={blob:URL.createObjectURL(new Blob([u8],{type:a.mime})),data:'data:'+a.mime+';base64,'+b64};
+  audioCache[a.id]=e;return e;
+}
+async function playNote(id){
+  const n=S.notes.find(x=>x.id===id);if(!n||!n.audio)return;
+  const pl=$('#player'),au=$('#pl-audio');
+  $('#pl-label').textContent='Audionoot van '+nameOf(n.author)+' laden…';pl.hidden=false;
+  try{
+    const e=await loadAudio(n.audio);let tried=false;
+    au.onerror=()=>{if(!tried){tried=true;au.src=e.data;au.play().catch(()=>{})}};
+    au.src=e.blob;$('#pl-label').textContent='Audionoot van '+nameOf(n.author);
+    au.play().catch(()=>{});
+  }catch(err){toast('Audio laden mislukt.');pl.hidden=true}
+}
+async function deleteNote(id){
+  const n=S.notes.find(x=>x.id===id);if(!n)return;
+  try{
+    if(n.audio){for(let i=0;i<n.audio.parts;i++)await S.db.doc('audio/'+n.audio.id+'/parts/'+pad(i)).delete();delete audioCache[n.audio.id]}
+    await S.db.doc('notes/'+id).delete();toast('Verwijderd');
+  }catch(e){toast(errMsg(e))}
+}
+
+/* ---------- schrijven naar de database ---------- */
+async function joinGroup(){
+  const name=(S.drafts['join-name']||S.myName||'').trim();
+  if(name.length<2){toast('Vul je naam in.');return}
+  try{await S.db.doc('members/'+S.uid).set({name:name.slice(0,30),joinedAt:Date.now()});toast('Welkom, '+name)}catch(e){toast(errMsg(e))}
+}
+async function renameMe(){
+  const name=(S.drafts['rename']||'').trim();if(name.length<2)return;
+  try{await S.db.doc('members/'+S.uid).update({name:name.slice(0,30)});S.drafts['rename']='';toast('Naam aangepast')}catch(e){toast(errMsg(e))}
+}
+async function setSpotlight(uid){try{await S.db.doc('months/'+S.month).set({spotlight:uid,by:S.uid})}catch(e){toast(errMsg(e))}}
+async function saveSpread(){
+  const d=S.draft,intent=(S.drafts['d-int']||'').trim(),key=S.month;
+  if(!(d.revealed.length===4||d.stopped)||!d.revealed.length){toast('Draai eerst je kaarten om.');return}
+  const id=spreadId(key,S.uid),old=S.spreads[id];
+  S.busy.save=true;render();
+  try{
+    if(!(S.months[key]&&S.months[key].spotlight)){const sp=rotation(key);if(sp)await S.db.doc('months/'+key).set({spotlight:sp,by:S.uid})}
+    await S.db.doc('spreads/'+id).set({month:key,uid:S.uid,intention:intent.slice(0,400),reversals:!!d.rev,cards:d.revealed.map(c=>({id:c.id,rev:!!c.rev})),stopped:!!d.stopped,clar:{},createdAt:old?old.createdAt:Date.now(),updatedAt:Date.now()});
+    S.draft=freshDraft();S.drafts['d-int']='';delete S.redo[key];toast('Legging bewaard');
+  }catch(e){toast(errMsg(e))}
+  delete S.busy.save;render();
+}
+async function saveNote(kind,sid){
+  const key=kind+'-'+sid,text=(S.drafts['t-'+key]||'').trim(),file=S.files['f-'+key];
+  if(kind==='reading'&&!file){toast('Kies een audiobestand voor je waarzegging.');return}
+  if(kind==='point'&&!text){toast('Schrijf eerst je opmerking.');return}
+  if(kind==='own'&&!text&&!file){toast('Voeg tekst of audio toe.');return}
+  S.busy[key]='Bezig…';render();
+  try{
+    let audio=null;
+    if(file)audio=await saveAudio(file,(i,n)=>{S.busy[key]='Audio uploaden '+i+'/'+n;render()});
+    await S.db.collection('notes').add({spread:sid,author:S.uid,kind,text:text.slice(0,2000),audio,at:Date.now()});
+    S.drafts['t-'+key]='';delete S.files['f-'+key];toast('Bewaard');
+  }catch(e){toast(errMsg(e))}
+  delete S.busy[key];render();
+}
+async function setClar(sid,idx,card,rev){
+  try{await S.db.doc('spreads/'+sid).update({clar:{[idx]:{id:card.id,rev:!!rev}},updatedAt:Date.now()});toast('Verduidelijkingskaart toegevoegd')}catch(e){toast(errMsg(e))}
+}
+async function saveDeckImg(id,file){
+  try{const img=await downscale(file,420);await S.db.doc('deckimg/'+id).set({img,by:S.uid,at:Date.now()});toast('Afbeelding bewaard')}catch(e){toast(errMsg(e))}
+}
+
+/* ---------- weergave ---------- */
+function toast(t){S.toast=t;const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>{el.hidden=true},3200)}
+let rq=0;
+function render(){if(rq)return;rq=requestAnimationFrame(()=>{rq=0;doRender()})}
+function doRender(){
+  const ae=document.activeElement,fid=ae&&ae.id,sel=ae&&typeof ae.selectionStart==='number'?[ae.selectionStart,ae.selectionEnd]:null;
+  $('#app').innerHTML=view();
+  const sh=$('#sheet');sh.innerHTML=S.sheet?sheetView():'';sh.hidden=!S.sheet;
+  if(fid){const n=document.getElementById(fid);if(n){n.focus({preventScroll:true});if(sel&&n.setSelectionRange){try{n.setSelectionRange(sel[0],sel[1])}catch(e){}}}}
+}
+
+function view(){
+  const tabs=[['maand','Maand'],['kaarten','Kaarten'],['leren','Leren'],['groep','Groep']];
+  let body='';
+  if(S.tab==='maand')body=maandView();else if(S.tab==='kaarten')body=kaartenView();else if(S.tab==='leren')body=lerenView();else body=groepView();
+  return '<div class="screen"><header class="top"><div class="in"><div class="brand"><b>Maanlegging</b><span>'+esc(me()?me().name:'Nieuwe-maanlegging van vier')+'</span></div>'
+   +'<nav class="tabs" aria-label="Onderdelen">'+tabs.map(t=>'<button type="button" data-act="tab" data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'">'+t[1]+'</button>').join('')+'</nav></div></header>'
+   +'<main class="wrap">'+body+'</main></div>';
+}
+
+function needDb(){
+  if(S.noDb)return '<div class="panel"><h2>Log in om mee te doen</h2><p>Dit onderdeel gebruikt de gedeelde database van de Claude-pagina. Open de pagina in claude.ai, ingelogd met het account waarmee je bent uitgenodigd. Op een losse website (zoals GitHub Pages) werken alleen de tabbladen Kaarten en Leren.</p></div>';
+  if(!(S.ready.members&&S.ready.spreads&&S.ready.notes))return '<div class="panel"><p class="muted">Gegevens worden opgehaald…</p></div>';
+  return '';
+}
+
+function maandView(){
+  const gate=needDb();if(gate)return gate;
+  const key=S.month,list=monthsList(),ix=list.indexOf(key);
+  let h='';
+  if(S.canWrite===false)h+='<div class="notice">Je kunt alleen meekijken. Vraag de eigenaar van deze pagina om je als bijdrager toe te voegen, dan kun je ook leggen en reageren.</div>';
+  h+='<div class="monthbar"><button type="button" class="btn" data-act="month" data-d="-1" '+(ix<=0?'disabled':'')+' aria-label="Vorige maand">←</button>'
+    +'<h1>'+esc(monthLabel(key))+'</h1><button type="button" class="btn" data-act="month" data-d="1" '+(ix<0||ix>=list.length-1?'disabled':'')+' aria-label="Volgende maand">→</button></div>';
+  if(!me()){
+    h+=joinPanel();return h;
+  }
+  h+=spotlightPanel(key);
+  const myId=spreadId(key,S.uid),mine=S.spreads[myId];
+  if(!mine||S.redo[key])h+=composer(key,!!mine);
+  const spot=spotlightOf(key),all=spreadsOf(key);
+  const ordered=all.slice().sort((a,b)=>(b.uid===spot)-(a.uid===spot)||(a.uid===S.uid?-1:1)-(b.uid===S.uid?-1:1));
+  ordered.forEach(sp=>{if(!(sp.uid===S.uid&&S.redo[key]))h+=spreadCard(sp,sp.uid===spot)});
+  if(!all.length&&(mine||S.redo[key]))h+='';
+  if(!all.length)h+='<div class="panel flat"><p class="muted">Nog niemand heeft deze maand gelegd.</p></div>';
+  return h;
+}
+
+function joinPanel(){
+  if(S.members.length>=4)return '<div class="panel"><h2>De groep zit vol</h2><p>Er doen al vier mensen mee: '+S.members.map(m=>esc(m.name)).join(', ')+'. Je kunt wel alles meelezen.</p></div>';
+  return '<div class="panel"><h2>Wie ben jij?</h2><p>Vul één keer je naam in. Je naam staat dan bij je leggingen en opmerkingen. Met maximaal vier deelnemers draait de spotlight elke maand door.</p>'
+   +'<label class="label" for="join-name">Jouw naam</label><input type="text" id="join-name" maxlength="30" value="'+esc(S.drafts['join-name']!=null?S.drafts['join-name']:S.myName)+'" autocomplete="off">'
+   +'<div class="row"><button type="button" class="btn primary" data-act="join">Doe mee</button><span class="muted small">'+S.members.length+' van 4 aangemeld</span></div></div>';
+}
+
+function spotlightPanel(key){
+  const spot=spotlightOf(key);
+  let h='<section class="panel hl"><div class="row between"><div class="stack" style="gap:2px"><span class="label">In de spotlight</span><h2>'+esc(spot?nameOf(spot):'Nog niemand')+'</h2></div>'
+   +'<div class="stack" style="gap:4px;min-width:150px"><label class="label" for="spot-sel">Wijzig spotlight</label><select id="spot-sel" data-chg="spot">'
+   +members().map(m=>'<option value="'+esc(m.id)+'"'+(m.id===spot?' selected':'')+'>'+esc(m.name)+'</option>').join('')+'</select></div></div>'
+   +'<p class="muted small">Alle vier leggen ze een Nieuwe-maanlegging. De anderen delen hun legging en leren van elkaars beeld. Wie in de spotlight staat, krijgt van de andere drie een waarzegging als audionoot.</p>'
+   +'</section>';
+  return h;
+}
+
+function slotClosed(i,label){const p=POS[i];return '<div class="slot"><span class="pos"><b>'+p.n+'</b><span>'+esc(p.name)+'</span></span><span class="art back"></span><span class="nm muted">'+esc(label||'Gesloten')+'</span></div>'}
+function slotOpen(i,c,rev,extra){
+  const p=POS[i];
+  return '<div class="slot"><button type="button" class="slot" data-act="card" data-card="'+c.id+'" data-rev="'+(rev?1:0)+'" data-pos="'+i+'" aria-label="'+esc(c.nl)+' bekijken">'
+   +'<span class="pos"><b>'+p.n+'</b><span>'+esc(p.name)+'</span></span>'+artHtml(c,rev)
+   +'<span class="nm">'+esc(c.nl)+(rev?'<em>omgekeerd</em>':'')+(c.safety?'<em>veiligheidskaart</em>':'')+'</span></button>'+(extra||'')+'</div>';
+}
+
+function composer(key,isRedo){
+  const d=S.draft,n=d.revealed.length,hasDraw=d.hidden.length>0;
+  let h='<section class="panel"><div class="stack" style="gap:2px"><span class="label">Nieuwe-maanlegging</span><h2>'+(isRedo?'Je legging opnieuw leggen':'Leg jouw maand')+'</h2></div>'
+   +'<p class="muted small">De legging voorspelt niets. Ze geeft inzicht in het nu en helpt je bewust de komende maand in te stappen.</p>'
+   +'<div class="stack" style="gap:6px"><label class="label" for="d-int">1. Intentie van de maand (optioneel)</label>'
+   +'<textarea id="d-int" maxlength="400" placeholder="Bijvoorbeeld: Ik wil deze maand meer rust in mijn werkweek.">'+esc(S.drafts['d-int']||'')+'</textarea>'
+   +'<span class="muted small">Dit hoeft absoluut niet. Vind je het fijn voor later, dan kun je hier je intentie voor deze maand invullen. Let op: wat je hier schrijft, is zichtbaar voor iedereen in de groep. Een intentie is een voornemen, geen levensvraag.</span></div>'
+   +'<div class="stack" style="gap:8px"><span class="label">2. Trek vier kaarten</span>'
+   +'<div class="row"><label class="row small" style="gap:6px"><input type="checkbox" data-chg="rev" '+(d.rev?'checked ':'')+(n||hasDraw?'disabled':'')+'> Met omgekeerde kaarten</label></div>'
+   +'<div class="row"><button type="button" class="filters-btn btn sm '+(d.mode==='digital'?'primary':'')+'" data-act="mode" data-mode="digital" '+(n||hasDraw?'disabled':'')+'>Digitaal trekken</button>'
+   +'<button type="button" class="btn sm '+(d.mode==='eigen'?'primary':'')+'" data-act="mode" data-mode="eigen" '+(n||hasDraw?'disabled':'')+'>Ik gebruik mijn eigen deck</button></div>'
+   +(d.mode==='digital'?'<p class="muted small">De vier kaarten worden gesloten getrokken en liggen op volgorde klaar. Draai ze één voor één om.</p>':'<p class="muted small">Kies je kaarten met je linkerhand uit de waaier en leg ze gesloten neer. Draai ze om en vul ze hier één voor één in, in de volgorde van de posities.</p>')
+   +'<div class="row4">';
+  for(let i=0;i<4;i++){
+    if(d.revealed[i]){const c=BYID[d.revealed[i].id];h+=slotOpen(i,c,d.revealed[i].rev);}
+    else if(d.stopped)h+=slotClosed(i,'Niet omgedraaid');
+    else if(d.mode==='digital'&&hasDraw){h+='<div class="slot"><span class="pos"><b>'+POS[i].n+'</b><span>'+esc(POS[i].name)+'</span></span><span class="art back"></span>'+(i===n?'<button type="button" class="btn sm primary" data-act="flip">Draai om</button>':'<span class="nm muted">Gesloten</span>')+'</div>'}
+    else{h+='<div class="slot"><span class="pos"><b>'+POS[i].n+'</b><span>'+esc(POS[i].name)+'</span></span><span class="art empty">Leeg</span>'+((d.mode==='eigen'&&i===n)?'<button type="button" class="btn sm primary" data-act="pick-open" data-purpose="next">Kaart invullen</button>':'')+'</div>'}
+  }
+  h+='</div>';
+  if(n<4&&!d.stopped&&n<4){
+    const next=POS[n];
+    if(d.mode==='digital'&&!hasDraw)h+='<div class="row"><button type="button" class="btn primary" data-act="draw">Schud en trek vier kaarten</button></div>';
+    if(hasDraw||d.mode==='eigen')h+='<div class="notice"><b>Kaart '+next.n+' · '+esc(next.name)+'.</b> '+esc(next.q)+'</div>';
+  }
+  if(d.stopped){
+    const last=BYID[d.revealed[d.revealed.length-1].id];
+    h+='<div class="notice stop"><b>Veiligheidskaart: '+esc(last.nl)+'. Stop de legging.</b><br>Je kijkt niet naar de overige kaarten. Sluit je ogen en neem een moment voor jezelf. Dit is het inzicht waar je om hebt gevraagd; wat je ermee doet, is aan jou. Het antwoord vind je bij jezelf.</div>';
+  }
+  h+='<div class="row">';
+  if(n&&d.mode==='eigen'&&!hasDraw)h+='<button type="button" class="btn sm ghost" data-act="undo">Laatste kaart wissen</button>';
+  if(n||hasDraw)h+='<button type="button" class="btn sm ghost" data-act="reset-draft">Opnieuw beginnen</button>';
+  if(isRedo)h+='<button type="button" class="btn sm ghost" data-act="cancel-redo">Annuleren</button>';
+  h+='</div></div>'
+   +'<div class="row"><button type="button" class="btn primary" data-act="save-spread" '+((d.revealed.length===4||d.stopped)&&d.revealed.length&&!S.busy.save?'':'disabled')+'>'+(S.busy.save?'Bewaren…':'Bewaar legging')+'</button><span class="muted small">Je legging wordt zichtbaar voor de groep.</span></div></section>';
+  return h;
+}
+
+function spreadCard(sp,isSpot){
+  const sid=spreadId(sp.month,sp.uid),mineSp=sp.uid===S.uid,owner=nameOf(sp.uid);
+  const cards=(sp.cards||[]).map(c=>({c:BYID[c.id],rev:c.rev}));
+  let h='<section class="panel"><div class="row between"><div class="stack" style="gap:2px"><span class="label">'+(mineSp?'Jouw legging':'Legging van '+esc(owner))+'</span><h2>'+esc(owner)+(isSpot?' · spotlight':'')+'</h2></div>'
+   +(mineSp?'<button type="button" class="btn sm" data-act="redo">Opnieuw leggen</button>':'')+'</div>';
+  if(sp.intention)h+='<div class="stack" style="gap:2px"><span class="label">Intentie</span><div class="quote">'+esc(sp.intention)+'</div></div>';
+  h+='<div class="row4">';
+  for(let i=0;i<4;i++){
+    const x=cards[i];
+    if(!x||!x.c){h+=slotClosed(i,sp.stopped?'Niet omgedraaid':'Onbekend');continue}
+    const cl=sp.clar&&sp.clar[i];let extra='';
+    if(cl&&BYID[cl.id]){const cc=BYID[cl.id];extra='<button type="button" class="slot" data-act="card" data-card="'+cc.id+'" data-rev="'+(cl.rev?1:0)+'" data-pos="-1" aria-label="Verduidelijkingskaart '+esc(cc.nl)+'"><span class="label" style="font-size:10.5px">Verduidelijking</span><span class="row" style="gap:6px;flex-wrap:nowrap"><span class="art" style="width:34px;flex:none"><img class="'+(cl.rev?'rev':'')+'" src="'+esc(imgOf(cc))+'" alt="" loading="lazy"></span><span class="nm">'+esc(cc.nl)+'</span></span></button>'}
+    else if(mineSp&&!sp.stopped)extra='<div class="slotbtns"><button type="button" class="btn sm" data-act="clar-draw" data-spread="'+sid+'" data-idx="'+i+'">Trek extra</button><button type="button" class="btn sm ghost" data-act="pick-open" data-purpose="clar" data-spread="'+sid+'" data-idx="'+i+'">Kies extra</button></div>';
+    h+=slotOpen(i,x.c,x.rev,extra);
+  }
+  h+='</div>';
+  if(sp.stopped){const last=cards[cards.length-1];h+='<div class="notice stop">Gestopt bij '+esc(last&&last.c?last.c.nl:'een veiligheidskaart')+'. De overige kaarten zijn niet omgedraaid.</div>'}
+  if(mineSp&&cards.length&&!sp.stopped)h+='<p class="muted small">Snapt een kaart er niet op de eerste plek? Trek of kies een verduidelijkingskaart, bij voorkeur uit een ander deck. Of slaap er een nachtje over.</p>';
+  const w=weetjes(sp);
+  if(w.length)h+='<div class="weet"><span class="label">Drie weetjes over de symboliek in deze legging</span><ul>'+w.map(x=>'<li><b>'+esc(x.label)+'.</b> '+esc(x.text)+'</li>').join('')+'</ul></div>';
+  /* eigen interpretatie */
+  const own=notesOf(sid,'own');
+  h+='<div class="stack"><span class="label">Eigen interpretatie</span>'+(own.length?own.map(noteHtml).join(''):'<p class="muted small">Nog geen interpretatie toegevoegd.</p>');
+  if(mineSp)h+=noteForm('own',sid,'Wat zie jij in je legging? Tekst en audio zijn allebei optioneel.','Bewaar interpretatie');
+  h+='</div>';
+  if(isSpot){
+    const rd=notesOf(sid,'reading');
+    h+='<div class="stack"><span class="label">Waarzeggingen van de anderen</span>'+(rd.length?rd.map(noteHtml).join(''):'<p class="muted small">Nog geen waarzeggingen. De andere drie nemen elk een verhaal op als audionoot.</p>');
+    if(!mineSp)h+=noteForm('reading',sid,'Vertel wat je ziet in deze legging. Neem een audionoot op, tekst erbij mag.','Bewaar waarzegging',true);
+    h+='</div>';
+  }
+  const pt=notesOf(sid,'point');
+  h+='<div class="stack"><span class="label">Aanvullingen</span>'+(pt.length?pt.map(noteHtml).join(''):'<p class="muted small">Nog geen aanvullingen.</p>');
+  if(!mineSp)h+=noteForm('point',sid,'Kort en puntig: wat valt je op?','Plaats aanvulling');
+  h+='</div></section>';
+  return h;
+}
+
+function noteHtml(n){
+  const mine=n.author===S.uid;
+  return '<article class="note"><div class="row between"><span><b>'+esc(nameOf(n.author))+'</b> <span class="muted small">'+esc(fmtTime(n.at))+'</span></span>'
+   +(mine?'<button type="button" class="btn sm ghost danger" data-act="del-note" data-id="'+esc(n.id)+'">'+(S.confirm===n.id?'Zeker? Tik nogmaals':'Verwijder')+'</button>':'')+'</div>'
+   +(n.text?'<p>'+esc(n.text)+'</p>':'')
+   +(n.audio?'<div><button type="button" class="btn sm" data-act="play" data-id="'+esc(n.id)+'">▶ Luister · '+(n.audio.size/1048576).toFixed(1)+' MB</button></div>':'')+'</article>';
+}
+function noteForm(kind,sid,hint,btn,needAudio){
+  const key=kind+'-'+sid,f=S.files['f-'+key],busy=S.busy[key],showAudio=kind!=='point';
+  return '<div class="stack" style="gap:8px;margin-top:4px"><p class="muted small">'+esc(hint)+'</p>'
+   +'<textarea id="t-'+key+'" '+(kind==='point'?'maxlength="280" style="min-height:56px"':'maxlength="2000"')+' placeholder="Tekst'+(needAudio?' (optioneel)':'')+'" '+(busy?'disabled':'')+'>'+esc(S.drafts['t-'+key]||'')+'</textarea>'
+   +'<div class="row">'+(showAudio?'<label class="btn sm filebtn"><input type="file" id="f-'+key+'" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.webm" data-file="1" '+(busy?'disabled':'')+'>🎙 '+(f?'Ander audiobestand':'Audio toevoegen')+'</label>'+(f?'<span class="small">'+esc(f.name)+' · '+(f.size/1048576).toFixed(1)+' MB</span>':''):'')
+   +'<button type="button" class="btn primary sm" data-act="note-save" data-kind="'+kind+'" data-spread="'+sid+'" '+(busy?'disabled':'')+'>'+esc(busy||btn)+'</button></div></div>';
+}
+
+/* ---------- kaarten, leren, groep ---------- */
+function kaartenView(){
+  const f=S.filter,q=S.q.trim().toLowerCase();
+  const list=ALL.filter(c=>{
+    if(f==='groot'&&c.arc!=='groot')return false;
+    if(['staven','bekers','zwaarden','pentakels'].includes(f)&&c.suit!==f)return false;
+    if(f==='veiligheid'&&!c.safety)return false;
+    if(q){const hay=(c.nl+' '+c.en+' '+(c.suit||'')+' '+c.kw.join(' ')).toLowerCase();if(!hay.includes(q))return false}
+    return true;
+  });
+  const fl=[['alle','Alle 80'],['groot','Grote arcana'],['staven','Staven'],['bekers','Bekers'],['zwaarden','Zwaarden'],['pentakels','Pentakels'],['veiligheid','Veiligheid']];
+  return '<div class="stack"><div class="stack" style="gap:2px"><h1 style="font-size:22px">Alle 80 kaarten</h1><p class="muted small">78 kaarten van het klassieke Rider-Waite-deck uit 1909, plus De Intuïtie en De Waarheid. Tik een kaart voor betekenis, kernwoorden en wat de beelden zeggen.</p></div>'
+   +'<input type="search" id="lib-q" placeholder="Zoek op naam of kernwoord" value="'+esc(S.q)+'">'
+   +'<div class="filters">'+fl.map(x=>'<button type="button" data-act="filter" data-f="'+x[0]+'" aria-pressed="'+(f===x[0])+'">'+x[1]+'</button>').join('')+'</div>'
+   +(list.length?'<div class="grid">'+list.map(c=>'<button type="button" class="thumb" data-act="card" data-card="'+c.id+'" data-rev="0" data-pos="-1">'+artHtml(c,false)+'<span class="nm">'+esc(c.nl)+'</span></button>').join('')+'</div>':'<p class="muted">Geen kaarten gevonden.</p>')+'</div>';
+}
+
+function lerenView(){
+  const suitRows=Object.keys(SUITS).map(k=>{const s=SUITS[k];return '<tr><th scope="row">'+s.naam+'</th><td>'+s.el+'</td><td>ik '+s.werk+'</td><td>'+s.thema+'</td></tr>'}).join('');
+  const numRows=Object.keys(NUMS).map(n=>'<tr><th scope="row">'+n+'</th><td>'+NUMS[n]+'</td></tr>').join('');
+  const courtRows=[11,12,13,14].map(n=>'<tr><th scope="row">'+COURT[n][0]+'</th><td>'+COURT[n][1]+'</td></tr>').join('');
+  return '<div class="stack"><div class="stack" style="gap:2px"><h1 style="font-size:22px">Leren</h1><p class="muted small">De afspraken en uitleg uit het werkboek van de tarotclub, in korte vorm, plus de beeldtaal van de kaarten.</p></div>'
+  +'<details open><summary>De vier regels</summary><div class="body">'
+   +'<p><b>1. Gebruik intenties.</b> Trek een kaart altijd met een intentie. Een intentie is een voornemen om iets te doen. Zo kijk je vooruit naar het mogelijke resultaat. Goede bedoelingen zijn niet altijd goed voor het resultaat, dus formuleer bewust.</p>'
+   +'<p><b>2. Stel geen levensvragen.</b> Vragen over de zin van het leven, wat er na de dood komt, wat een leven waardevol maakt of of er een hogere macht bestaat, hebben geen definitief antwoord. Dat geeft frustratie en eindeloos piekeren, terwijl tarot juist helpt om te handelen.</p>'
+   +'<p><b>3. Tarot is voor het nu.</b> Je voorspelt niets over het verleden of de toekomst. De legging helpt je bewust de komende maand, week of dag in te stappen. De toekomst wordt gecreëerd in het heden: het gaat om focus en aandacht voor wat je wilt creëren.</p>'
+   +'<p><b>4. Werk met 80 kaarten.</b> Het deck bevat 78 kaarten plus De Intuïtie en De Waarheid. Dit zijn veiligheidskaarten. Niet alle antwoorden liggen in de kaarten: deze twee wijzen je terug naar jezelf.</p>'
+  +'</div></details>'
+  +'<details><summary>Als een veiligheidskaart valt</summary><div class="body"><p>Je stopt de legging. Je kijkt niet naar de volgende kaarten. Dat is een kwestie van respect voor de kaarten, en je weet nooit wie er aan de knoppen draait. Sluit je ogen en neem een moment voor jezelf. Het antwoord ligt diep van binnen al klaar, of de waarheid komt vanzelf boven tafel. Wat je ermee doet, is aan jou. In deze app stopt de legging vanzelf zodra je zo&apos;n kaart omdraait.</p></div></details>'
+  +'<details><summary>Zo leg je de kaarten</summary><div class="body"><ol>'
+   +'<li><b>Schud.</b> Houd je intentie in je hoofd of spreek haar hardop uit. Valt er tijdens het schudden een kaart uit het deck? Dat kan een boodschap zijn. Zoek de betekenis op, stop de kaart terug en schud verder.</li>'
+   +'<li><b>Leg de kaarten neer.</b> Maak een stapel voor je en schuif ze uit tot een waaier.</li>'
+   +'<li><b>Kies de kaarten.</b> Kiezen is een gevoelskwestie. Pak een kaart met je linkerhand: links is de gevoelskant van je lijf en staat het dichtst bij je innerlijk weten. Laat je oog vallen op een kaart, of voel met je hand over de waaier waar het warm of koud wordt.</li>'
+   +'<li><b>Leg elke kaart gesloten op zijn plek.</b> Pak eerst alle kaarten voordat je gaat interpreteren.</li>'
+   +'<li><b>Draai de kaarten om.</b> Eerst de eerste kaart. Die interpreteer je, daarna volgt de volgende.</li></ol></div></details>'
+  +'<details><summary>De Nieuwe-maanlegging van deze app</summary><div class="body"><p>Vier kaarten, van links naar rechts:</p><ol>'
+   +POS.map(p=>'<li><b>'+p.name+'.</b> '+p.q+' <span class="muted">('+p.hint+')</span></li>').join('')
+   +'</ol></div></details>'
+  +'<details><summary>Zo interpreteer je</summary><div class="body"><ul>'
+   +'<li>Begin met de vraag die bij de plek hoort. Lees daarna het beeld, het element, het getal en pas dan de kernwoorden.</li>'
+   +'<li>Slaat een kaart nergens op? Slaap er een nachtje over, of trek een verduidelijkingskaart.</li>'
+   +'<li>Een verduidelijkingskaart trek je op dezelfde manier, met als intentie: uitleg bij de vorige kaart. Gebruik daarvoor bij voorkeur een ander deck, want het kan voorkomen dat je dezelfde kaart weer trekt.</li>'
+   +'<li>Voorbeeld: de vraag is waar je meer aandacht aan kunt geven. Je trekt Rad van Fortuin (geluk, kansen, lot). Dat is lastig om aandacht aan te geven, dus trek je De Wereld ter verduidelijking (afronding, vrijheid). Soms is ook dat niet genoeg en trek je De Zon (geluk en vreugde). Samen wijzen ze op aandacht voor wat jou gelukkig maakt.</li>'
+   +'<li>Eerst alle kaarten omdraaien is niet nodig. Eén voor één werkt het best.</li></ul></div></details>'
+  +'<details><summary>Omgekeerde kaarten</summary><div class="body"><p>Een omgekeerde kaart ligt op zijn kop nadat je hem hebt omgedraaid. Rechtop kan de energie vrij stromen. Omgekeerd stroomt de energie minder vrij en wijst de kaart vaak op moeilijkheden of uitdagingen op het gebied van die kaart. Werken met omgekeerde kaarten is een keuze. Ben je net begonnen? Leg dan alle kaarten rechtop, want 80 kaarten leren is al genoeg.</p><p class="muted small">In deze app zet je dat per legging aan of uit.</p></div></details>'
+  +'<details><summary>Andere legpatronen (drie kaarten)</summary><div class="body">'
+   +'<p><b>Schaduw.</b> 1. Wat is er in mij wat ik niet geheel onder ogen kan komen? Waar kom ik mezelf tegen? 2. Hoe uit deze schaduwkant zich, of op welk thema? 3. Wat maakt de schaduw draaglijk en wat helpt me om haar te accepteren of ermee om te gaan?</p>'
+   +'<p><b>Plezier.</b> 1. Waar heb ik plezier in? Wat maakt me blij? 2. Wat heb ik nodig voor meer plezier? Misschien moet je iets loslaten of juist iets meer aandacht geven. 3. Wat houdt me tegen om plezier te hebben?</p>'
+   +'<p><b>Groei.</b> 1. Wat gaat goed? 2. Wat kan ik verbeteren? 3. Wat heb ik nodig? Deze kaart helpt je bij het thema, ook al staat hij los van de andere kaarten.</p></div></details>'
+  +'<details><summary>Beeldtaal: wat betekenen de symbolen?</summary><div class="body">'
+   +'<p>Elke kaart vertelt in beelden. Kijk eerst wat je ziet, en lees dan pas het woord erbij.</p>'
+   +'<h3>De vier kleuren</h3><div class="scroll"><table class="t"><thead><tr><th>Kleur</th><th>Element</th><th>Werkwoord</th><th>Gaat over</th></tr></thead><tbody>'+suitRows+'</tbody></table></div>'
+   +'<h3>De getallen</h3><div class="scroll"><table class="t"><tbody>'+numRows+'</tbody></table></div>'
+   +'<h3>De hofkaarten</h3><div class="scroll"><table class="t"><tbody>'+courtRows+'</tbody></table></div>'
+   +'<h3>Grote en kleine arcana</h3><p>De 22 grote arcana zijn de grote levensthema\'s. Ligt er veel groots in je legging, dan gaat het om meer dan het dagelijkse. De 56 kleine arcana gaan over wat er dit moment in je leven speelt.</p>'
+   +'<h3>Kleuren en richting</h3><ul><li><b>Geel:</b> bewustzijn en vreugde.</li><li><b>Blauw:</b> water, gevoel en rust.</li><li><b>Rood:</b> passie en actie.</li><li><b>Wit:</b> zuiverheid en een nieuw begin.</li><li><b>Zwart:</b> het onbekende, bescherming of rouw.</li><li><b>Groen:</b> groei.</li><li><b>Kijkrichting:</b> kijkt een figuur naar links, dan kijkt hij vaak naar wat achter hem ligt. Naar rechts: vooruit.</li></ul>'
+  +'</div></details></div>';
+}
+
+function groepView(){
+  const gate=needDb();if(gate)return gate;
+  const ms=members();
+  let h='<div class="stack"><h1 style="font-size:22px">Groep</h1><section class="panel"><span class="label">Deelnemers · '+ms.length+' van 4</span><ul class="hw">'
+   +ms.map((m,i)=>'<li><span>'+(i+1)+'. '+esc(m.name)+(m.id===S.uid?' <span class="chip">jij</span>':'')+'</span></li>').join('')+'</ul>'
+   +(ms.length<4?'<p class="muted small">Nog '+(4-ms.length)+' plek'+(4-ms.length===1?'':'ken')+' vrij. Elke deelnemer meldt zich één keer aan op het tabblad Maand.</p>':'')+'</section>';
+  if(me())h+='<section class="panel"><label class="label" for="rename">Naam aanpassen</label><input type="text" id="rename" maxlength="30" value="'+esc(S.drafts['rename']!=null?S.drafts['rename']:me().name)+'"><div class="row"><button type="button" class="btn sm" data-act="rename">Bewaar naam</button></div></section>';
+  if(ms.length){
+    const now=new Date(),rows=[];
+    for(let i=0;i<6;i++){const k=monthKey(new Date(now.getFullYear(),now.getMonth()+i,1));rows.push('<li><span>'+esc(monthLabel(k))+'</span><b>'+esc(nameOf(spotlightOf(k)))+'</b></li>')}
+    h+='<section class="panel"><span class="label">Spotlight de komende maanden</span><ul class="hw">'+rows.join('')+'</ul><p class="muted small">De volgorde volgt de aanmeldvolgorde. Je kunt de spotlight per maand wijzigen op het tabblad Maand.</p></section>';
+  }
+  return h+'</div>';
+}
+
+/* ---------- onderste blad ---------- */
+function sheetView(){
+  const s=S.sheet;
+  if(s.type==='card'){
+    const c=BYID[s.card];if(!c)return '';
+    const rev=!!s.rev,p=s.pos>=0?POS[s.pos]:null;
+    const meta=c.arc==='groot'?'Grote arcana'+(c.astro?' · '+c.astro:''):c.safety?'Veiligheidskaart':SUITS[c.suit].naam+' · '+SUITS[c.suit].el;
+    let h='<div class="sheetbox" role="dialog" aria-modal="true" aria-label="'+esc(c.nl)+'"><div class="cardhead">'+artHtml(c,rev)
+     +'<div class="stack" style="gap:6px"><h2>'+esc(c.nl)+'</h2><span class="muted small">'+esc(c.en)+' · '+esc(meta)+'</span>'
+     +(s.rev!==undefined&&s.pos!==undefined&&s.fromSpread?'<span class="chip '+(rev?'warn':'ok')+'">'+(rev?'Omgekeerd getrokken':'Rechtop getrokken')+'</span>':'')
+     +'<div class="row" style="gap:6px">'+c.kw.map(k=>'<span class="chip">'+esc(k)+'</span>').join('')+'</div></div></div>';
+    if(p)h+='<div class="notice"><b>Plek '+p.n+' · '+esc(p.name)+'.</b> '+esc(p.q)+'<br><span class="muted small">Lees de kaart als antwoord op deze vraag.</span></div>';
+    if(c.safety)h+='<div class="notice stop">Veiligheidskaart. Valt deze kaart in een legging, dan stop je en kijk je niet naar de overige kaarten.</div>';
+    h+='<div class="stack" style="gap:8px"><div'+(!rev&&s.fromSpread?' style="font-weight:600"':'')+'><span class="label">Rechtop</span><p>'+esc(c.up)+'</p></div>'
+     +'<div'+(rev&&s.fromSpread?' style="font-weight:600"':'')+'><span class="label">Omgekeerd</span><p>'+esc(c.rev)+'</p></div></div>'
+     +'<div class="stack" style="gap:6px"><span class="label">Wat zeggen de beelden?</span><ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px">'
+     +c.cues.map(x=>'<li><b>'+esc(x[0])+'.</b> '+esc(x[1])+'</li>').join('')+'</ul>'
+     +(p?'<p class="muted small">Waar zie je dit beeld terug in jouw maand, bij &quot;'+esc(p.name.toLowerCase())+'&quot;?</p>':'')+'</div>';
+    if(c.safety&&S.uid&&S.ready.members)h+='<div class="stack" style="gap:6px"><span class="label">Eigen scan van deze kaart</span><label class="btn sm filebtn" style="align-self:flex-start"><input type="file" id="sc-'+c.id+'" accept="image/*" data-file="1">Afbeelding vervangen</label><span class="muted small">De getoonde afbeelding komt uit een foto van het werkboek. Upload een scherpe scan en iedereen ziet die.</span></div>';
+    h+='<div class="row"><button type="button" class="btn" data-act="sheet-close">Sluiten</button></div></div>';
+    return h;
+  }
+  if(s.type==='pick'){
+    const q=(S.drafts['pick-q']||'').trim().toLowerCase();
+    const used=new Set(s.purpose==='next'?S.draft.revealed.map(x=>x.id):[]);
+    const list=ALL.filter(c=>!used.has(c.id)&&(!q||(c.nl+' '+c.en+' '+(c.suit||'')+' '+c.kw.join(' ')).toLowerCase().includes(q)));
+    const allowRev=s.purpose==='next'?S.draft.rev:!!(S.spreads[s.spread]&&S.spreads[s.spread].reversals);
+    const title=s.purpose==='next'?'Kaart '+(S.draft.revealed.length+1)+' · '+POS[S.draft.revealed.length].name:'Verduidelijkingskaart';
+    return '<div class="sheetbox" role="dialog" aria-modal="true" aria-label="Kaart kiezen"><h2>'+esc(title)+'</h2>'
+     +'<input type="search" id="pick-q" placeholder="Zoek je kaart" value="'+esc(S.drafts['pick-q']||'')+'">'
+     +(allowRev?'<label class="row small" style="gap:6px"><input type="checkbox" data-chg="pickrev" '+(s.rev?'checked':'')+'> De kaart ligt omgekeerd</label>':'')
+     +'<div class="pick">'+list.map(c=>'<button type="button" class="pickrow" data-act="pick" data-card="'+c.id+'">'+artHtml(c,false)+'<span><b>'+esc(c.nl)+'</b>'+(c.safety?' <span class="chip warn">veiligheidskaart</span>':'')+'<br><span class="muted small">'+esc(c.arc==='groot'?'Grote arcana':c.safety?'Extra kaart':SUITS[c.suit].naam)+'</span></span></button>').join('')+(list.length?'':'<p class="muted">Geen kaarten gevonden.</p>')+'</div>'
+     +'<div class="row"><button type="button" class="btn" data-act="sheet-close">Annuleren</button></div></div>';
+  }
+  return '';
+}
+
+/* ---------- acties ---------- */
+function pickCard(id){
+  const s=S.sheet,c=BYID[id];if(!c)return;
+  if(s.purpose==='next'){
+    const d=S.draft;d.revealed.push({id,rev:!!(d.rev&&s.rev)});if(c.safety)d.stopped=true;
+  }else{
+    const sp=S.spreads[s.spread];setClar(s.spread,s.idx,c,!!(sp&&sp.reversals&&s.rev));
+  }
+  S.sheet=null;S.drafts['pick-q']='';render();
+}
+function act(a,t){
+  const d=t.dataset;
+  switch(a){
+    case 'tab':S.tab=d.tab;window.scrollTo(0,0);break;
+    case 'month':{const l=monthsList(),i=l.indexOf(S.month)+Number(d.d);if(i>=0&&i<l.length){S.month=l[i];S.draft=freshDraft()}break}
+    case 'join':joinGroup();return;
+    case 'rename':renameMe();return;
+    case 'mode':S.draft.mode=d.mode;break;
+    case 'draw':{
+      const pool=ALL.slice(),dr=drawDistinct(4,pool);
+      S.draft.hidden=dr.map(c=>({id:c.id,rev:S.draft.rev&&rndBool()}));S.draft.revealed=[];S.draft.stopped=false;break}
+    case 'flip':{
+      const dd=S.draft,nx=dd.hidden[dd.revealed.length];if(!nx)break;
+      dd.revealed.push(nx);if(BYID[nx.id].safety){dd.stopped=true;dd.hidden=dd.hidden.slice(0,dd.revealed.length)}break}
+    case 'undo':{const dd=S.draft;dd.revealed.pop();dd.stopped=false;break}
+    case 'reset-draft':S.draft=freshDraft();break;
+    case 'redo':S.redo[S.month]=true;S.draft=freshDraft();break;
+    case 'cancel-redo':delete S.redo[S.month];S.draft=freshDraft();break;
+    case 'save-spread':saveSpread();return;
+    case 'card':S.sheet={type:'card',card:d.card,rev:d.rev==='1',pos:Number(d.pos),fromSpread:Number(d.pos)>=0};break;
+    case 'sheet-close':S.sheet=null;break;
+    case 'pick-open':S.sheet={type:'pick',purpose:d.purpose,spread:d.spread,idx:d.idx!=null?Number(d.idx):0,rev:false};S.drafts['pick-q']='';break;
+    case 'pick':pickCard(d.card);return;
+    case 'clar-draw':{
+      const sp=S.spreads[d.spread];if(!sp)break;
+      const used=new Set(sp.cards.map(c=>c.id));
+      const pool=ALL.filter(c=>!c.safety&&!used.has(c.id));
+      const c=pool[rndInt(pool.length)];setClar(d.spread,Number(d.idx),c,!!(sp.reversals&&rndBool()));return}
+    case 'note-save':saveNote(d.kind,d.spread);return;
+    case 'play':playNote(d.id);return;
+    case 'del-note':
+      if(S.confirm===d.id){S.confirm=null;deleteNote(d.id)}else{S.confirm=d.id;clearTimeout(act.t);act.t=setTimeout(()=>{S.confirm=null;render()},4000)}
+      break;
+    case 'filter':S.filter=d.f;break;
+    case 'player-close':{const au=$('#pl-audio');au.pause();$('#player').hidden=true;return}
+  }
+  render();
+}
+document.addEventListener('click',e=>{
+  const sh=e.target;if(sh.id==='sheet'){S.sheet=null;render();return}
+  const t=e.target.closest('[data-act]');if(t&&!t.disabled)act(t.dataset.act,t);
+});
+document.addEventListener('input',e=>{
+  const el=e.target;if(!el.id)return;
+  if(el.matches('textarea,input[type=text],input[type=search]')){
+    if(el.id==='lib-q'){S.q=el.value;render();return}
+    S.drafts[el.id]=el.value;
+    if(el.id==='pick-q')render();
+  }
+});
+document.addEventListener('change',e=>{
+  const el=e.target;
+  if(el.type==='file'&&el.files&&el.files[0]){
+    if(el.id.startsWith('f-')){S.files[el.id]=el.files[0];render()}
+    else if(el.id.startsWith('sc-')){saveDeckImg(el.id.slice(3),el.files[0])}
+    return;
+  }
+  const c=el.dataset&&el.dataset.chg;if(!c)return;
+  if(c==='spot')setSpotlight(el.value);
+  else if(c==='rev'){S.draft.rev=el.checked;render()}
+  else if(c==='pickrev'){S.sheet.rev=el.checked;render()}
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.sheet){S.sheet=null;render()}});
+
+/* ---------- opstarten ---------- */
+async function boot(){
+  doRender();
+  const c=window.claude;
+  if(!c||!c.use){S.noDb=true;render();return}
+  let db=null,user=null;
+  try{[db,user]=await Promise.all([c.use('db'),c.use('user')])}catch(e){}
+  S.db=db;S.user=user;
+  if(user){try{const m=await user.me();S.uid=m.id;S.myName=m.name||'';S.canWrite=await user.can('data.write')}catch(e){}}
+  if(!db||!S.uid){S.noDb=true;render();return}
+  const fail=e=>{toast(errMsg(e))};
+  db.collection('members').onSnapshot(sn=>{S.members=sn.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0)||(a.id<b.id?-1:1));S.ready.members=true;render()},fail);
+  db.collection('months').onSnapshot(sn=>{S.months={};sn.docs.forEach(d=>S.months[d.id]=d.data());render()},fail);
+  db.collection('spreads').onSnapshot(sn=>{S.spreads={};sn.docs.forEach(d=>S.spreads[d.id]=d.data());S.ready.spreads=true;render()},fail);
+  db.collection('notes').onSnapshot(sn=>{S.notes=sn.docs.map(d=>Object.assign({id:d.id},d.data()));S.ready.notes=true;render()},fail);
+  db.collection('deckimg').onSnapshot(sn=>{S.deckimg={};sn.docs.forEach(d=>S.deckimg[d.id]=d.data());render()},fail);
+}
+boot();
+})();
+</script>
+
+</html>
