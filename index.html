@@ -72,6 +72,14 @@ textarea{min-height:88px;resize:vertical}
 .slot{display:flex;flex-direction:column;gap:6px;background:none;border:0;padding:0;text-align:left;min-width:0;color:inherit}
 .slot .pos{display:flex;gap:6px;align-items:flex-start;font-family:var(--font-head);font-size:11.5px;line-height:1.25;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);font-weight:500;min-height:30px}
 .slot .pos b{flex:none;width:19px;height:19px;border-radius:50%;background:var(--ribbon);color:var(--ink);display:grid;place-items:center;font-size:11px;font-family:var(--font-body);font-weight:800}
+.qimg{width:150px;margin:0 auto}
+.qtext{font-size:18px}
+.qopts{display:flex;flex-direction:column;gap:8px}
+.qopt{text-align:left;background:var(--paper);border:1.5px solid var(--ink);border-radius:10px;padding:11px 14px;font-size:15px;line-height:1.35}
+.qopt:disabled{cursor:default;opacity:1}
+.qopt.good{background:#cfe6b5;border-color:var(--green-text)}
+.qopt.bad{background:#f3cfc4;border-color:#b5452c}
+.qwhy{background:var(--cream);border-radius:10px;padding:10px 12px}
 .art{display:block;aspect-ratio:300/527;border-radius:9px;overflow:hidden;background:var(--sage-soft);box-shadow:0 2px 6px rgba(34,48,74,.28)}
 .art img{width:100%;height:100%;object-fit:cover;display:block}
 .art img.rev{transform:rotate(180deg)}
@@ -365,7 +373,7 @@ function errMsg(e){const c=e&&e.code;if(c==='invalid_argument')return 'Opslaan l
 
 /* ---------- toestand ---------- */
 const S={db:null,user:null,uid:null,myName:'',canWrite:null,noDb:false,sb:null,sbCfg:!!(window.SB_CONFIG&&window.SB_CONFIG.url&&window.SB_CONFIG.key),authMode:'in',authMsg:'',authBusy:false,
-  ready:{members:false,spreads:false,notes:false},
+  ready:{members:false,spreads:false,notes:false},quizDocs:[],quizFeed:null,
   members:[],months:{},spreads:{},notes:[],deckimg:{},
   tab:'maand',month:monthKey(new Date()),filter:'alle',q:'',
   draft:freshDraft(),redo:{},drafts:{},files:{},busy:{},sheet:null,confirm:null,toast:'',reversals:false};
@@ -529,9 +537,9 @@ function doRender(){
 }
 
 function view(){
-  const tabs=[['maand','Maand'],['kaarten','Kaarten'],['leren','Leren'],['groep','Groep']];
+  const tabs=[['maand','Legging'],['kaarten','Kaarten'],['leren','Ontwikkelen'],['quiz','Daily quiz'],['groep','Groep']];
   let body='';
-  if(S.tab==='maand')body=maandView();else if(S.tab==='kaarten')body=kaartenView();else if(S.tab==='leren')body=lerenView();else body=groepView();
+  if(S.tab==='maand')body=maandView();else if(S.tab==='kaarten')body=kaartenView();else if(S.tab==='leren')body=lerenView();else if(S.tab==='quiz')body=quizView();else body=groepView();
   return '<div class="screen"><header class="top"><div class="in"><div class="brand"><b>Maanlegging</b><span>'+esc(me()?me().name:'Nieuwe-maanlegging van vier')+'</span></div>'
    +'<nav class="tabs" aria-label="Onderdelen">'+tabs.map(t=>'<button type="button" data-act="tab" data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'">'+t[1]+'</button>').join('')+'</nav></div></header>'
    +'<main class="wrap">'+body+'</main></div>';
@@ -571,7 +579,7 @@ async function doAuth(){
   }
 }
 function needDb(){
-  if(S.noDb){if(S.sbCfg&&S.sb)return authPanel();return '<div class="panel"><h2>Gedeelde database nog niet gekoppeld</h2><p>Dit onderdeel heeft een gedeelde database nodig. In de Claude-pagina is die er al. Op GitHub Pages moet je eerst Supabase koppelen. Het stappenplan staat in de README. Tot die tijd werken de tabbladen Kaarten en Leren.</p></div>'}  if(!(S.ready.members&&S.ready.spreads&&S.ready.notes))return '<div class="panel"><p class="muted">Gegevens worden opgehaald…</p></div>';
+  if(S.noDb){if(S.sbCfg&&S.sb)return authPanel();return '<div class="panel"><h2>Gedeelde database nog niet gekoppeld</h2><p>Dit onderdeel heeft een gedeelde database nodig. In de Claude-pagina is die er al. Op GitHub Pages moet je eerst Supabase koppelen. Het stappenplan staat in de README. Tot die tijd werken de tabbladen Kaarten en Ontwikkelen.</p></div>'}  if(!(S.ready.members&&S.ready.spreads&&S.ready.notes))return '<div class="panel"><p class="muted">Gegevens worden opgehaald…</p></div>';
   return '';
 }
 
@@ -733,42 +741,127 @@ function lerenView(){
   const suitRows=Object.keys(SUITS).map(k=>{const s=SUITS[k];return '<tr><th scope="row">'+s.naam+'</th><td>'+s.el+'</td><td>ik '+s.werk+'</td><td>'+s.thema+'</td></tr>'}).join('');
   const numRows=Object.keys(NUMS).map(n=>'<tr><th scope="row">'+n+'</th><td>'+NUMS[n]+'</td></tr>').join('');
   const courtRows=[11,12,13,14].map(n=>'<tr><th scope="row">'+COURT[n][0]+'</th><td>'+COURT[n][1]+'</td></tr>').join('');
-  return '<div class="stack"><div class="stack" style="gap:2px"><h1 style="font-size:22px">Leren</h1><p class="muted small">De afspraken en uitleg uit het werkboek van de tarotclub, in korte vorm, plus de beeldtaal van de kaarten.</p></div>'
-  +'<details open><summary>De vier regels</summary><div class="body">'
-   +'<p><b>1. Gebruik intenties.</b> Trek een kaart altijd met een intentie. Een intentie is een voornemen om iets te doen. Zo kijk je vooruit naar het mogelijke resultaat. Goede bedoelingen zijn niet altijd goed voor het resultaat, dus formuleer bewust.</p>'
-   +'<p><b>2. Stel geen levensvragen.</b> Vragen over de zin van het leven, wat er na de dood komt, wat een leven waardevol maakt of of er een hogere macht bestaat, hebben geen definitief antwoord. Dat geeft frustratie en eindeloos piekeren, terwijl tarot juist helpt om te handelen.</p>'
-   +'<p><b>3. Tarot is voor het nu.</b> Je voorspelt niets over het verleden of de toekomst. De legging helpt je bewust de komende maand, week of dag in te stappen. De toekomst wordt gecreëerd in het heden: het gaat om focus en aandacht voor wat je wilt creëren.</p>'
-   +'<p><b>4. Werk met 80 kaarten.</b> Het deck bevat 78 kaarten plus De Intuïtie en De Waarheid. Dit zijn veiligheidskaarten. Niet alle antwoorden liggen in de kaarten: deze twee wijzen je terug naar jezelf.</p>'
-  +'</div></details>'
-  +'<details><summary>Als een veiligheidskaart valt</summary><div class="body"><p>Je stopt de legging. Je kijkt niet naar de volgende kaarten. Dat is een kwestie van respect voor de kaarten, en je weet nooit wie er aan de knoppen draait. Sluit je ogen en neem een moment voor jezelf. Het antwoord ligt diep van binnen al klaar, of de waarheid komt vanzelf boven tafel. Wat je ermee doet, is aan jou. In deze app stopt de legging vanzelf zodra je zo&apos;n kaart omdraait.</p></div></details>'
-  +'<details><summary>Zo leg je de kaarten</summary><div class="body"><ol>'
-   +'<li><b>Schud.</b> Houd je intentie in je hoofd of spreek haar hardop uit. Valt er tijdens het schudden een kaart uit het deck? Dat kan een boodschap zijn. Zoek de betekenis op, stop de kaart terug en schud verder.</li>'
-   +'<li><b>Leg de kaarten neer.</b> Maak een stapel voor je en schuif ze uit tot een waaier.</li>'
-   +'<li><b>Kies de kaarten.</b> Kiezen is een gevoelskwestie. Pak een kaart met je linkerhand: links is de gevoelskant van je lijf en staat het dichtst bij je innerlijk weten. Laat je oog vallen op een kaart, of voel met je hand over de waaier waar het warm of koud wordt.</li>'
-   +'<li><b>Leg elke kaart gesloten op zijn plek.</b> Pak eerst alle kaarten voordat je gaat interpreteren.</li>'
-   +'<li><b>Draai de kaarten om.</b> Eerst de eerste kaart. Die interpreteer je, daarna volgt de volgende.</li></ol></div></details>'
-  +'<details><summary>De Nieuwe-maanlegging van deze app</summary><div class="body"><p>Vier kaarten, van links naar rechts:</p><ol>'
-   +POS.map(p=>'<li><b>'+p.name+'.</b> '+p.q+' <span class="muted">('+p.hint+')</span></li>').join('')
-   +'</ol></div></details>'
-  +'<details><summary>Zo interpreteer je</summary><div class="body"><ul>'
-   +'<li>Begin met de vraag die bij de plek hoort. Lees daarna het beeld, het element, het getal en pas dan de kernwoorden.</li>'
-   +'<li>Slaat een kaart nergens op? Slaap er een nachtje over, of trek een verduidelijkingskaart.</li>'
-   +'<li>Een verduidelijkingskaart trek je op dezelfde manier, met als intentie: uitleg bij de vorige kaart. Gebruik daarvoor bij voorkeur een ander deck, want het kan voorkomen dat je dezelfde kaart weer trekt.</li>'
-   +'<li>Voorbeeld: de vraag is waar je meer aandacht aan kunt geven. Je trekt Rad van Fortuin (geluk, kansen, lot). Dat is lastig om aandacht aan te geven, dus trek je De Wereld ter verduidelijking (afronding, vrijheid). Soms is ook dat niet genoeg en trek je De Zon (geluk en vreugde). Samen wijzen ze op aandacht voor wat jou gelukkig maakt.</li>'
-   +'<li>Eerst alle kaarten omdraaien is niet nodig. Eén voor één werkt het best.</li></ul></div></details>'
-  +'<details><summary>Omgekeerde kaarten</summary><div class="body"><p>Een omgekeerde kaart ligt op zijn kop nadat je hem hebt omgedraaid. Rechtop kan de energie vrij stromen. Omgekeerd stroomt de energie minder vrij en wijst de kaart vaak op moeilijkheden of uitdagingen op het gebied van die kaart. Werken met omgekeerde kaarten is een keuze. Ben je net begonnen? Leg dan alle kaarten rechtop, want 80 kaarten leren is al genoeg.</p><p class="muted small">In deze app zet je dat per legging aan of uit.</p></div></details>'
-  +'<details><summary>Andere legpatronen (drie kaarten)</summary><div class="body">'
-   +'<p><b>Schaduw.</b> 1. Wat is er in mij wat ik niet geheel onder ogen kan komen? Waar kom ik mezelf tegen? 2. Hoe uit deze schaduwkant zich, of op welk thema? 3. Wat maakt de schaduw draaglijk en wat helpt me om haar te accepteren of ermee om te gaan?</p>'
-   +'<p><b>Plezier.</b> 1. Waar heb ik plezier in? Wat maakt me blij? 2. Wat heb ik nodig voor meer plezier? Misschien moet je iets loslaten of juist iets meer aandacht geven. 3. Wat houdt me tegen om plezier te hebben?</p>'
-   +'<p><b>Groei.</b> 1. Wat gaat goed? 2. Wat kan ik verbeteren? 3. Wat heb ik nodig? Deze kaart helpt je bij het thema, ook al staat hij los van de andere kaarten.</p></div></details>'
-  +'<details><summary>Beeldtaal: wat betekenen de symbolen?</summary><div class="body">'
+  return '<div class="stack"><div class="stack" style="gap:2px"><h1 style="font-size:22px">Ontwikkelen</h1><p class="muted small">De beeldtaal van de kaarten en de afspraken uit het werkboek van de tarotclub, in korte vorm.</p></div>'
+  +'<details open><summary>Beeldtaal: wat betekenen de symbolen?</summary><div class="body">'
    +'<p>Elke kaart vertelt in beelden. Kijk eerst wat je ziet, en lees dan pas het woord erbij.</p>'
    +'<h3>De vier kleuren</h3><div class="scroll"><table class="t"><thead><tr><th>Kleur</th><th>Element</th><th>Werkwoord</th><th>Gaat over</th></tr></thead><tbody>'+suitRows+'</tbody></table></div>'
    +'<h3>De getallen</h3><div class="scroll"><table class="t"><tbody>'+numRows+'</tbody></table></div>'
    +'<h3>De hofkaarten</h3><div class="scroll"><table class="t"><tbody>'+courtRows+'</tbody></table></div>'
    +'<h3>Grote en kleine arcana</h3><p>De 22 grote arcana zijn de grote levensthema\'s. Ligt er veel groots in je legging, dan gaat het om meer dan het dagelijkse. De 56 kleine arcana gaan over wat er dit moment in je leven speelt.</p>'
    +'<h3>Kleuren en richting</h3><ul><li><b>Geel:</b> bewustzijn en vreugde.</li><li><b>Blauw:</b> water, gevoel en rust.</li><li><b>Rood:</b> passie en actie.</li><li><b>Wit:</b> zuiverheid en een nieuw begin.</li><li><b>Zwart:</b> het onbekende, bescherming of rouw.</li><li><b>Groen:</b> groei.</li><li><b>Kijkrichting:</b> kijkt een figuur naar links, dan kijkt hij vaak naar wat achter hem ligt. Naar rechts: vooruit.</li></ul>'
-  +'</div></details></div>';
+  +'</div></details>'
+  +'<details><summary>Maanlegging 🌙</summary><div class="body"><p>Vier kaarten, van links naar rechts:</p><ol>'
+   +POS.map(p=>'<li><b>'+p.name+'.</b> '+p.q+' <span class="muted">('+p.hint+')</span></li>').join('')
+   +'</ol></div></details>'
+  +'<details><summary>Andere legpatronen</summary><div class="body">'
+   +'<p><b>Schaduw.</b> 1. Wat is er in mij wat ik niet geheel onder ogen kan komen? Waar kom ik mezelf tegen? 2. Hoe uit deze schaduwkant zich, of op welk thema? 3. Wat maakt de schaduw draaglijk en wat helpt me om haar te accepteren of ermee om te gaan?</p>'
+   +'<p><b>Plezier.</b> 1. Waar heb ik plezier in? Wat maakt me blij? 2. Wat heb ik nodig voor meer plezier? Misschien moet je iets loslaten of juist iets meer aandacht geven. 3. Wat houdt me tegen om plezier te hebben?</p>'
+   +'<p><b>Groei.</b> 1. Wat gaat goed? 2. Wat kan ik verbeteren? 3. Wat heb ik nodig? Deze kaart helpt je bij het thema, ook al staat hij los van de andere kaarten.</p></div></details>'
+  +'<details><summary>De vier regels</summary><div class="body">'
+   +'<p><b>1. Gebruik intenties.</b> Trek een kaart altijd met een intentie. Een intentie is een voornemen om iets te doen. Zo kijk je vooruit naar het mogelijke resultaat. Goede bedoelingen zijn niet altijd goed voor het resultaat, dus formuleer bewust.</p>'
+   +'<p><b>2. Stel geen levensvragen.</b> Vragen over de zin van het leven, wat er na de dood komt, wat een leven waardevol maakt of of er een hogere macht bestaat, hebben geen definitief antwoord. Dat geeft frustratie en eindeloos piekeren, terwijl tarot juist helpt om te handelen.</p>'
+   +'<p><b>3. Tarot is voor het nu.</b> Je voorspelt niets over het verleden of de toekomst. De legging helpt je bewust de komende maand, week of dag in te stappen. De toekomst wordt gecreëerd in het heden: het gaat om focus en aandacht voor wat je wilt creëren.</p>'
+   +'<p><b>4. Werk met 80 kaarten.</b> Het deck bevat 78 kaarten plus De Intuïtie en De Waarheid. Dit zijn veiligheidskaarten. Niet alle antwoorden liggen in de kaarten: deze twee wijzen je terug naar jezelf.</p>'
+  +'</div></details>'
+  +'<details><summary>Als een veiligheidskaart wordt getrokken</summary><div class="body"><p>Dit gaat om de kaarten De Intuïtie en De Waarheid. Je stopt de legging. Je kijkt niet naar de volgende kaarten. Dat is een kwestie van respect voor de kaarten. Sluit je ogen en neem een moment voor jezelf. Het antwoord ligt diep van binnen al klaar, of de waarheid komt vanzelf boven tafel. Wat je ermee doet, is aan jou. In deze app stopt de legging vanzelf zodra je zo&apos;n kaart omdraait.</p></div></details>'
+  +'</div>';
+}
+
+/* ---------- daily quiz ---------- */
+const QPTS=7;
+const dayKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function shuf(a,rnd){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function pickN(pool,n,rnd,skip){return shuf(pool.filter(x=>!skip||skip(x)),rnd).slice(0,n)}
+function kwText(c){return c.kw.slice(0,3).join(', ').toLowerCase()}
+function firstSent(t){const m=String(t).match(/^.*?[.!?](\s|$)/);return (m?m[0]:t).trim()}
+function mkQ(rnd,text,correct,wrongs,extra){
+  const opts=shuf([correct].concat(wrongs.slice(0,3)),rnd);
+  return Object.assign({text,opts,ok:opts.indexOf(correct)},extra||{});
+}
+function makeQuestion(type,rnd){
+  const real=BASE.filter(c=>c.kw&&c.kw.length>=3);
+  const c=real[Math.floor(rnd()*real.length)];
+  const other=(f)=>pickN(BASE,3,rnd,x=>x.id!==c.id&&(!f||f(x)));
+  if(type==='A'){
+    const w=other(x=>x.arc===c.arc);
+    return mkQ(rnd,'Welke kaart is dit?',c.nl,w.map(x=>x.nl),{card:c,why:c.nl+': '+c.kw.slice(0,3).join(', ').toLowerCase()+'.'});
+  }
+  if(type==='B'){
+    const w=other(x=>x.kw.length>=3);
+    return mkQ(rnd,'Welke kernwoorden horen bij deze kaart?',kwText(c),w.map(kwText),{card:c,why:c.nl+' staat voor '+kwText(c)+'.'});
+  }
+  if(type==='C'){
+    const w=other();
+    return mkQ(rnd,'Welke kaart past bij deze kernwoorden: '+kwText(c)+'?',c.nl,w.map(x=>x.nl),{why:c.nl+' staat voor '+kwText(c)+'.'});
+  }
+  if(type==='D'){
+    const cc=shuf(BASE.filter(x=>x.cues&&x.cues.length),rnd)[0],cue=cc.cues[Math.floor(rnd()*cc.cues.length)];
+    const w=[];shuf(BASE.filter(x=>x.id!==cc.id&&x.cues&&x.cues.length),rnd).forEach(x=>{const m=x.cues[0][1];if(w.length<3&&m!==cue[1])w.push(m)});
+    return mkQ(rnd,'Op '+cc.nl+' zie je: '+cue[0].toLowerCase()+'. Wat betekent dat beeld?',cue[1],w,{card:cc,why:cue[0]+': '+cue[1]});
+  }
+  if(type==='E'){
+    const ks=shuf(Object.keys(NUMS).filter(k=>+k<=10),rnd),n=ks[0];
+    return mkQ(rnd,'Waar staat het getal '+n+' in de tarot voor?',NUMS[n],ks.slice(1,4).map(k=>NUMS[k]),{why:'Een '+n+' staat voor '+NUMS[n]+'.'});
+  }
+  if(type==='F'){
+    const ks=shuf(Object.keys(SUITS),rnd),k=ks[0],su=SUITS[k];
+    return mkQ(rnd,'Welk element hoort bij '+su.naam+'?',su.el,['vuur','water','lucht','aarde'].filter(e=>e!==su.el),{why:su.naam+' hoort bij '+su.el+' en gaat over '+su.thema+'.'});
+  }
+  /* H: betekenis -> kaart */
+  const w=other(x=>x.arc===c.arc);
+  return mkQ(rnd,'Welke kaart past bij deze betekenis? “'+firstSent(c.up)+'”',c.nl,w.map(x=>x.nl),{why:c.nl+': '+c.kw.slice(0,3).join(', ').toLowerCase()+'.'});
+}
+function dailyQuestions(day){
+  const rnd=mulberry(hash('quiz-'+day));
+  const types=shuf(['A','B','C','D','E','F','H'],rnd).slice(0,3);
+  return types.map(t=>makeQuestion(t,rnd));
+}
+const quizId=(day,uid)=>day+'__'+uid;
+function quizTotals(){
+  const t={};
+  S.members.forEach(m=>t[m.id]={id:m.id,name:m.name,pts:0,days:0,today:0});
+  const today=dayKey(new Date());
+  S.quizDocs.forEach(d=>{const r=t[d.uid];if(!r)return;const n=(d.answers||[]).length;if(n===0)return;r.pts+=d.score||0;if(n>=3)r.days++;if(d.date===today)r.today=d.score||0});
+  return Object.values(t).sort((a,b)=>b.pts-a.pts||b.days-a.days||(a.name>b.name?1:-1));
+}
+async function quizStart(){
+  const day=dayKey(new Date());
+  try{await S.db.doc('quiz/'+quizId(day,S.uid)).set({uid:S.uid,date:day,score:0,answers:[],at:Date.now()})}catch(e){toast(errMsg(e))}
+}
+async function quizAnswer(pick){
+  const day=dayKey(new Date()),qs=dailyQuestions(day),doc=S.quizDocs.find(d=>d.id===quizId(day,S.uid));
+  if(!doc)return;const k=(doc.answers||[]).length;if(k>=3||S.quizFeed)return;
+  const good=qs[k].ok===pick,answers=(doc.answers||[]).concat([pick]),score=(doc.score||0)+(good?QPTS:0);
+  S.quizFeed={q:k,pick};render();
+  try{await S.db.doc('quiz/'+doc.id).update({answers,score,at:Date.now()})}catch(e){S.quizFeed=null;toast(errMsg(e));render()}
+}
+function scoreboard(){
+  const rows=quizTotals().map((r,i)=>'<tr><th scope="row">'+(i+1)+'. '+esc(r.name)+(r.id===S.uid?' <span class="muted">(jij)</span>':'')+'</th><td>'+r.today+'</td><td>'+r.days+'</td><td><b>'+r.pts+'</b></td></tr>').join('');
+  return '<section class="panel"><span class="label">Scorebord</span><div class="scroll"><table class="t"><thead><tr><th>Deelnemer</th><th>Vandaag</th><th>Dagen</th><th>Totaal</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="muted small">Elk goed antwoord is '+QPTS+' punten. Elke dag opnieuw spelen telt op.</p></section>';
+}
+function quizView(){
+  const gate=needDb();if(gate)return gate;
+  if(!me())return '<div class="panel"><h2>Daily quiz</h2><p>Meld je eerst aan op het tabblad Legging, dan kun je meedoen en komt je score op het scorebord.</p></div>';
+  const day=dayKey(new Date()),qs=dailyQuestions(day),doc=S.quizDocs.find(d=>d.id===quizId(day,S.uid));
+  let main;
+  if(!doc){
+    main='<section class="panel stack"><h2>Daily quiz</h2><p>Drie vragen van de dag over de kaarten, de beeldtaal en de betekenissen. Voor elk goed antwoord krijg je '+QPTS+' punten. Je kunt één keer per dag spelen.</p><div class="row"><button type="button" class="btn" data-act="quiz-start">Start de quiz</button></div></section>';
+  }else{
+    const done=(doc.answers||[]).length;
+    const k=S.quizFeed&&S.quizFeed.q===done-1?done-1:done;
+    if(k>=3){
+      main='<section class="panel stack"><h2>Klaar voor vandaag</h2><p>Je scoorde <b>'+(doc.score||0)+'</b> van de '+(3*QPTS)+' punten. Kom morgen terug voor drie nieuwe vragen.</p></section>';
+    }else{
+      const q=qs[k],fb=S.quizFeed&&S.quizFeed.q===k?S.quizFeed:null;
+      main='<section class="panel stack"><span class="label">Vraag '+(k+1)+' van 3</span>'
+        +(q.card?'<div class="qimg">'+artHtml(q.card,false,false)+'</div>':'')
+        +'<h2 class="qtext">'+esc(q.text)+'</h2><div class="qopts">'
+        +q.opts.map((o,i)=>{let cls='qopt';if(fb){if(i===q.ok)cls+=' good';else if(i===fb.pick)cls+=' bad'}return '<button type="button" class="'+cls+'" data-act="quiz-pick" data-i="'+i+'"'+(fb?' disabled':'')+'>'+esc(o)+'</button>'}).join('')+'</div>'
+        +(fb?'<p class="qwhy"><b>'+(fb.pick===q.ok?'Goed! +'+QPTS+' punten. ':'Helaas. ')+'</b>'+esc(q.why)+'</p><div class="row"><button type="button" class="btn" data-act="quiz-next">'+(k===2?'Bekijk je score':'Volgende vraag')+'</button></div>':'')
+        +'</section>';
+    }
+  }
+  return '<div class="stack">'+main+scoreboard()+'</div>';
 }
 
 function groepView(){
@@ -776,13 +869,13 @@ function groepView(){
   const ms=members();
   let h='<div class="stack"><h1 style="font-size:22px">Groep</h1><section class="panel"><span class="label">Deelnemers · '+ms.length+' van 4</span><ul class="hw">'
    +ms.map((m,i)=>'<li><span>'+(i+1)+'. '+esc(m.name)+(m.id===S.uid?' <span class="chip">jij</span>':'')+'</span></li>').join('')+'</ul>'
-   +(ms.length<4?'<p class="muted small">Nog '+(4-ms.length)+' plek'+(4-ms.length===1?'':'ken')+' vrij. Elke deelnemer meldt zich één keer aan op het tabblad Maand.</p>':'')+'</section>';
+   +(ms.length<4?'<p class="muted small">Nog '+(4-ms.length)+' plek'+(4-ms.length===1?'':'ken')+' vrij. Elke deelnemer meldt zich één keer aan op het tabblad Legging.</p>':'')+'</section>';
   if(me())h+='<section class="panel"><label class="label" for="rename">Naam aanpassen</label><input type="text" id="rename" maxlength="30" value="'+esc(S.drafts['rename']!=null?S.drafts['rename']:me().name)+'"><div class="row"><button type="button" class="btn sm" data-act="rename">Bewaar naam</button></div></section>';
   if(S.sb)h+='<section class="panel"><div class="row between"><span class="small muted">Ingelogd</span><button type="button" class="btn sm" data-act="signout">Uitloggen</button></div></section>';
   if(ms.length){
     const now=new Date(),rows=[];
     for(let i=0;i<6;i++){const k=monthKey(new Date(now.getFullYear(),now.getMonth()+i,1));rows.push('<li><span>'+esc(monthLabel(k))+'</span><b>'+esc(nameOf(spotlightOf(k)))+'</b></li>')}
-    h+='<section class="panel"><span class="label">Spotlight de komende maanden</span><ul class="hw">'+rows.join('')+'</ul><p class="muted small">De volgorde volgt de aanmeldvolgorde. Je kunt de spotlight per maand wijzigen op het tabblad Maand.</p></section>';
+    h+='<section class="panel"><span class="label">Spotlight de komende maanden</span><ul class="hw">'+rows.join('')+'</ul><p class="muted small">De volgorde volgt de aanmeldvolgorde. Je kunt de spotlight per maand wijzigen op het tabblad Legging.</p></section>';
   }
   return h+'</div>';
 }
@@ -838,6 +931,9 @@ function act(a,t){
   const d=t.dataset;
   switch(a){
     case 'tab':S.tab=d.tab;window.scrollTo(0,0);break;
+    case 'quiz-start':quizStart();break;
+    case 'quiz-pick':quizAnswer(+d.i);break;
+    case 'quiz-next':S.quizFeed=null;render();break;
     case 'month':{const l=monthsList(),i=l.indexOf(S.month)+Number(d.d);if(i>=0&&i<l.length){S.month=l[i];S.draft=freshDraft()}break}
     case 'join':joinGroup();return;
     case 'rename':renameMe();return;
@@ -971,6 +1067,7 @@ async function boot(){
   db.collection('members').onSnapshot(sn=>{S.members=sn.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0)||(a.id<b.id?-1:1));S.ready.members=true;render()},fail);
   db.collection('months').onSnapshot(sn=>{S.months={};sn.docs.forEach(d=>S.months[d.id]=d.data());render()},fail);
   db.collection('spreads').onSnapshot(sn=>{S.spreads={};sn.docs.forEach(d=>S.spreads[d.id]=d.data());S.ready.spreads=true;render()},fail);
+  db.collection('quiz').onSnapshot(sn=>{S.quizDocs=sn.docs.map(d=>Object.assign({id:d.id},d.data()));render()},fail);
   db.collection('notes').onSnapshot(sn=>{S.notes=sn.docs.map(d=>Object.assign({id:d.id},d.data()));S.ready.notes=true;render()},fail);
 }
 boot();
