@@ -72,6 +72,7 @@ textarea{min-height:88px;resize:vertical}
 .slot{display:flex;flex-direction:column;gap:6px;background:none;border:0;padding:0;text-align:left;min-width:0;color:inherit}
 .slot .pos{display:flex;gap:6px;align-items:flex-start;font-family:var(--font-head);font-size:11.5px;line-height:1.25;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);font-weight:500;min-height:30px}
 .slot .pos b{flex:none;width:19px;height:19px;border-radius:50%;background:var(--ribbon);color:var(--ink);display:grid;place-items:center;font-size:11px;font-family:var(--font-body);font-weight:800}
+.foot{font-size:12px;color:var(--ink);text-align:center;margin:6px 0 0}
 .qimg{width:150px;margin:0 auto}
 .qtext{font-size:18px}
 .qopts{display:flex;flex-direction:column;gap:8px}
@@ -738,7 +739,7 @@ function kaartenView(){
 }
 
 function lerenView(){
-  const suitRows=Object.keys(SUITS).map(k=>{const s=SUITS[k];return '<tr><th scope="row">'+s.naam+'</th><td>'+s.el+'</td><td>ik '+s.werk+'</td><td>'+s.thema+'</td></tr>'}).join('');
+  const suitRows=Object.keys(SUITS).map(k=>{const s=SUITS[k];return '<tr><th scope="row">'+s.naam+'</th><td>'+s.el+'</td><td>'+s.werk+'</td><td>'+s.thema+'</td></tr>'}).join('');
   const numRows=Object.keys(NUMS).map(n=>'<tr><th scope="row">'+n+'</th><td>'+NUMS[n]+'</td></tr>').join('');
   const courtRows=[11,12,13,14].map(n=>'<tr><th scope="row">'+COURT[n][0]+'</th><td>'+COURT[n][1]+'</td></tr>').join('');
   return '<div class="stack"><div class="stack" style="gap:2px"><h1 style="font-size:22px">Ontwikkelen</h1><p class="muted small">De beeldtaal van de kaarten en de afspraken uit het werkboek van de tarotclub, in korte vorm.</p></div>'
@@ -764,7 +765,7 @@ function lerenView(){
    +'<p><b>4. Werk met 80 kaarten.</b> Het deck bevat 78 kaarten plus De Intuïtie en De Waarheid. Dit zijn veiligheidskaarten. Niet alle antwoorden liggen in de kaarten: deze twee wijzen je terug naar jezelf.</p>'
   +'</div></details>'
   +'<details><summary>Als een veiligheidskaart wordt getrokken</summary><div class="body"><p>Dit gaat om de kaarten De Intuïtie en De Waarheid. Je stopt de legging. Je kijkt niet naar de volgende kaarten. Dat is een kwestie van respect voor de kaarten. Sluit je ogen en neem een moment voor jezelf. Het antwoord ligt diep van binnen al klaar, of de waarheid komt vanzelf boven tafel. Wat je ermee doet, is aan jou. In deze app stopt de legging vanzelf zodra je zo&apos;n kaart omdraait.</p></div></details>'
-  +'</div>';
+  +'</div><p class="foot">Heb je feedback op of ideeën voor deze app? Zet ze in de Signal groep.</p>';
 }
 
 /* ---------- daily quiz ---------- */
@@ -836,8 +837,8 @@ async function quizAnswer(pick){
   try{await S.db.doc('quiz/'+doc.id).update({answers,score,at:Date.now()})}catch(e){S.quizFeed=null;toast(errMsg(e));render()}
 }
 function scoreboard(){
-  const rows=quizTotals().map((r,i)=>'<tr><th scope="row">'+(i+1)+'. '+esc(r.name)+(r.id===S.uid?' <span class="muted">(jij)</span>':'')+'</th><td>'+r.today+'</td><td>'+r.days+'</td><td><b>'+r.pts+'</b></td></tr>').join('');
-  return '<section class="panel"><span class="label">Scorebord</span><div class="scroll"><table class="t"><thead><tr><th>Deelnemer</th><th>Vandaag</th><th>Dagen</th><th>Totaal</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="muted small">Elk goed antwoord is '+QPTS+' punten. Elke dag opnieuw spelen telt op.</p></section>';
+  const rows=quizTotals().map((r,i)=>'<tr><th scope="row">'+(i+1)+'. '+esc(r.name)+(r.id===S.uid?' <span class="muted">(jij)</span>':'')+'</th><td>'+r.today+'</td><td><b>'+r.pts+'</b></td></tr>').join('');
+  return '<section class="panel"><span class="label">Scorebord</span><div class="scroll"><table class="t"><thead><tr><th>Deelnemer</th><th>Vandaag</th><th>Totaal</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="muted small">Elk goed antwoord is '+QPTS+' punten. Elke dag opnieuw spelen telt op.</p></section>';
 }
 function quizView(){
   const gate=needDb();if(gate)return gate;
@@ -845,7 +846,7 @@ function quizView(){
   const day=dayKey(new Date()),qs=dailyQuestions(day),doc=S.quizDocs.find(d=>d.id===quizId(day,S.uid));
   let main;
   if(!doc){
-    main='<section class="panel stack"><h2>Daily quiz</h2><p>Drie vragen van de dag over de kaarten, de beeldtaal en de betekenissen. Voor elk goed antwoord krijg je '+QPTS+' punten. Je kunt één keer per dag spelen.</p><div class="row"><button type="button" class="btn" data-act="quiz-start">Start de quiz</button></div></section>';
+    main='<section class="panel stack"><h2>Daily quiz</h2><p>Drie vragen van de dag over de kaarten, de beeldtaal en de betekenissen.</p><div class="row"><button type="button" class="btn" data-act="quiz-start">Start de quiz</button></div></section>';
   }else{
     const done=(doc.answers||[]).length;
     const k=S.quizFeed&&S.quizFeed.q===done-1?done-1:done;
