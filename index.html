@@ -865,12 +865,56 @@ function quizView(){
   return '<div class="stack">'+main+scoreboard()+'</div>';
 }
 
+/* ---------- nieuwe-maanherinnering (agenda-bestand) ---------- */
+function newMoons(from,count){
+  const out=[];let k=Math.floor((from.getFullYear()+(from.getMonth()/12)-2000)*12.3685)-1;
+  while(out.length<count){
+    const T=k/1236.85,r=Math.PI/180,E=1-0.002516*T-0.0000074*T*T;
+    const M=(2.5534+29.1053567*k-0.0000014*T*T)*r,Mp=(201.5643+385.81693528*k+0.0107582*T*T)*r,F=(160.7108+390.67050284*k-0.0016118*T*T)*r;
+    let jde=2451550.09766+29.530588861*k+0.00015437*T*T
+      -0.4072*Math.sin(Mp)+0.17241*E*Math.sin(M)+0.01608*Math.sin(2*Mp)+0.01039*Math.sin(2*F)+0.00739*E*Math.sin(Mp-M)
+      -0.00514*E*Math.sin(Mp+M)+0.00208*E*E*Math.sin(2*M)-0.00111*Math.sin(Mp-2*F)-0.00057*Math.sin(Mp+2*F)+0.00056*E*Math.sin(2*Mp+M)
+      -0.00042*Math.sin(3*Mp)+0.00042*E*Math.sin(M+2*F)+0.00038*E*Math.sin(M-2*F)-0.00024*E*Math.sin(2*Mp-M);
+    const d=new Date((jde-2440587.5)*86400000-69000);
+    if(d>=from)out.push(d);k++;
+  }
+  return out;
+}
+const nlParts=d=>{const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Amsterdam',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);return p.replace(/-/g,'')};
+function moonIcs(){
+  const ms=newMoons(new Date(),24),stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+  let o=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Maanlegging//NL','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:Nieuwe maan',
+  'BEGIN:VTIMEZONE','TZID:Europe/Amsterdam','BEGIN:DAYLIGHT','TZOFFSETFROM:+0100','TZOFFSETTO:+0200','TZNAME:CEST','DTSTART:19700329T020000','RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU','END:DAYLIGHT',
+  'BEGIN:STANDARD','TZOFFSETFROM:+0200','TZOFFSETTO:+0100','TZNAME:CET','DTSTART:19701025T030000','RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU','END:STANDARD','END:VTIMEZONE'];
+  ms.forEach(d=>{
+    const day=nlParts(d);
+    o.push('BEGIN:VEVENT','UID:nieuwemaan-'+day+'@maanlegging','DTSTAMP:'+stamp,'DTSTART;TZID=Europe/Amsterdam:'+day+'T080000','DTEND;TZID=Europe/Amsterdam:'+day+'T083000',
+     'SUMMARY:Nieuwe maan 🌙 Tijd voor je Nieuwe-maanlegging','DESCRIPTION:Het is nieuwe maan. Leg vandaag je vier kaarten in de Maanlegging-app.',
+     'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Nieuwe maan: tijd voor je maanlegging','TRIGGER:PT0M','END:VALARM','END:VEVENT');
+  });
+  o.push('END:VCALENDAR');return o.join('\r\n');
+}
+function downloadMoonIcs(){
+  try{
+    const b=new Blob([moonIcs()],{type:'text/calendar;charset=utf-8'}),u=URL.createObjectURL(b),a=document.createElement('a');
+    a.href=u;a.download='nieuwe-maan.ics';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);
+    toast('Open het bestand om de herinneringen toe te voegen aan je agenda');
+  }catch(e){toast('Downloaden lukt niet in deze weergave. Open de app via de GitHub-pagina.')}
+}
+function moonPanel(){
+  const n=newMoons(new Date(),3),fmt=d=>new Intl.DateTimeFormat('nl-NL',{timeZone:'Europe/Amsterdam',weekday:'long',day:'numeric',month:'long'}).format(d);
+  return '<section class="panel stack"><span class="label">Nieuwe maan 🌙</span><p>De volgende nieuwe maan is op <b>'+fmt(n[0])+'</b>. Zet voor de komende 2 jaar een herinnering van 8:00 in je agenda, dan krijg je op elke nieuwe maan een melding.</p>'
+   +'<div class="row"><button type="button" class="btn" data-act="moon-ics">Zet in mijn agenda</button></div>'
+   +'<p class="muted small">Open het gedownloade bestand en kies je agenda-app. Iedereen doet dit één keer op de eigen telefoon.</p></section>';
+}
+
 function groepView(){
   const gate=needDb();if(gate)return gate;
   const ms=members();
   let h='<div class="stack"><h1 style="font-size:22px">Groep</h1><section class="panel"><span class="label">Deelnemers · '+ms.length+' van 4</span><ul class="hw">'
    +ms.map((m,i)=>'<li><span>'+(i+1)+'. '+esc(m.name)+(m.id===S.uid?' <span class="chip">jij</span>':'')+'</span></li>').join('')+'</ul>'
    +(ms.length<4?'<p class="muted small">Nog '+(4-ms.length)+' plek'+(4-ms.length===1?'':'ken')+' vrij. Elke deelnemer meldt zich één keer aan op het tabblad Legging.</p>':'')+'</section>';
+  h+=moonPanel();
   if(me())h+='<section class="panel"><label class="label" for="rename">Naam aanpassen</label><input type="text" id="rename" maxlength="30" value="'+esc(S.drafts['rename']!=null?S.drafts['rename']:me().name)+'"><div class="row"><button type="button" class="btn sm" data-act="rename">Bewaar naam</button></div></section>';
   if(S.sb)h+='<section class="panel"><div class="row between"><span class="small muted">Ingelogd</span><button type="button" class="btn sm" data-act="signout">Uitloggen</button></div></section>';
   if(ms.length){
@@ -934,6 +978,7 @@ function act(a,t){
     case 'tab':S.tab=d.tab;window.scrollTo(0,0);break;
     case 'quiz-start':quizStart();break;
     case 'quiz-pick':quizAnswer(+d.i);break;
+    case 'moon-ics':downloadMoonIcs();break;
     case 'quiz-next':S.quizFeed=null;render();break;
     case 'month':{const l=monthsList(),i=l.indexOf(S.month)+Number(d.d);if(i>=0&&i<l.length){S.month=l[i];S.draft=freshDraft()}break}
     case 'join':joinGroup();return;
