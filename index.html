@@ -79,6 +79,11 @@ textarea{min-height:88px;resize:vertical}
 .slot .pos{display:flex;gap:6px;align-items:flex-start;font-family:var(--font-head);font-size:11.5px;line-height:1.25;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);font-weight:500;min-height:30px}
 .slot .pos b{flex:none;width:19px;height:19px;border-radius:50%;background:var(--ribbon);color:var(--ink);display:grid;place-items:center;font-size:11px;font-family:var(--font-body);font-weight:800}
 .foot{font-size:12px;color:var(--ink);text-align:center;margin:6px 0 0}
+.nuhead{display:flex;gap:14px;align-items:flex-start}
+.nuhead .artbtn{width:112px;flex:none;background:none;border:0;padding:0;display:block}
+.nuhead .artbtn .art{width:100%}
+button.who{background:none;border:0;padding:0;color:var(--green-text);font-size:14px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+button.who[aria-current="true"]{text-decoration:underline}
 .qimg{width:150px;margin:0 auto}
 .qtext{font-size:18px}
 .qopts{display:flex;flex-direction:column;gap:8px}
@@ -380,7 +385,7 @@ function errMsg(e){const c=e&&e.code;if(c==='invalid_argument')return 'Opslaan l
 
 /* ---------- toestand ---------- */
 const S={db:null,user:null,uid:null,myName:'',canWrite:null,noDb:false,sb:null,sbCfg:!!(window.SB_CONFIG&&window.SB_CONFIG.url&&window.SB_CONFIG.key),authMode:'in',authMsg:'',authBusy:false,
-  ready:{members:false,spreads:false,notes:false},quizDocs:[],quizFeed:null,
+  ready:{members:false,spreads:false,notes:false},quizDocs:[],quizFeed:null,nuDocs:[],nu:{mode:'digital',rev:false,hidden:null,card:null},nuShow:5,
   members:[],months:{},spreads:{},notes:[],deckimg:{},
   tab:'maand',month:monthKey(new Date()),filter:'alle',q:'',
   draft:freshDraft(),redo:{},drafts:{},files:{},busy:{},sheet:null,confirm:null,toast:'',reversals:false};
@@ -544,10 +549,10 @@ function doRender(){
 }
 
 function view(){
-  const tabs=[['maand','Legging'],['kaarten','Kaarten'],['leren','Ontwikkelen'],['quiz','Daily quiz'],['groep','Groep']];
+  const tabs=[['maand','Maanlegging'],['nu','Nu-kaart'],['kaarten','Kaarten'],['leren','Ontwikkelen'],['quiz','Daily quiz']];
   let body='';
-  if(S.tab==='maand')body=maandView();else if(S.tab==='kaarten')body=kaartenView();else if(S.tab==='leren')body=lerenView();else if(S.tab==='quiz')body=quizView();else body=groepView();
-  return '<div class="screen"><header class="top"><div class="in"><div class="brand"><b>Maanlegging</b><span>'+esc(me()?me().name:'Nieuwe-maanlegging van vier')+'</span></div>'
+  if(S.tab==='maand')body=maandView();else if(S.tab==='kaarten')body=kaartenView();else if(S.tab==='leren')body=lerenView();else if(S.tab==='quiz')body=quizView();else if(S.tab==='nu')body=nuView();else body=groepView();
+  return '<div class="screen"><header class="top"><div class="in"><div class="brand"><b>Maanlegging</b><button type="button" class="who" data-act="tab" data-tab="groep" aria-label="Groep en instellingen" aria-current="'+(S.tab==='groep')+'">'+esc(me()?me().name:'Groep')+' <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" style="vertical-align:-3px"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17.2" cy="9" r="2.4"/><path d="M17 14c2.4 0 4.2 1.6 4.2 4.2"/></svg></button></div>'
    +'<nav class="tabs" aria-label="Onderdelen">'+tabs.map(t=>'<button type="button" data-act="tab" data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'">'+t[1]+'</button>').join('')+'</nav></div></header>'
    +'<main class="wrap">'+body+'</main></div>';
 }
@@ -848,7 +853,7 @@ function scoreboard(){
 }
 function quizView(){
   const gate=needDb();if(gate)return gate;
-  if(!me())return '<div class="panel"><h2>Daily quiz</h2><p>Meld je eerst aan op het tabblad Legging, dan kun je meedoen en komt je score op het scorebord.</p></div>';
+  if(!me())return '<div class="panel"><h2>Daily quiz</h2><p>Meld je eerst aan op het tabblad Maanlegging, dan kun je meedoen en komt je score op het scorebord.</p></div>';
   const day=dayKey(new Date()),qs=dailyQuestions(day),doc=S.quizDocs.find(d=>d.id===quizId(day,S.uid));
   let main;
   if(!doc){
@@ -914,19 +919,91 @@ function moonPanel(){
    +'<p class="muted small">Open het gedownloade bestand en kies je agenda-app. Iedereen doet dit één keer op de eigen telefoon.</p></section>';
 }
 
+/* ---------- Nu-kaart: een losse kaart voor dit moment ---------- */
+async function saveNu(){
+  const n=S.nu;if(!n.card){toast('Draai eerst je kaart om.');return}
+  S.busy.nu=true;render();
+  try{
+    await S.db.collection('nukaarten').add({uid:S.uid,card:{id:n.card.id,rev:!!n.card.rev},question:(S.drafts['n-int']||'').trim().slice(0,300),mode:n.mode,at:Date.now()});
+    S.nu={mode:n.mode,rev:n.rev,hidden:null,card:null};S.drafts['n-int']='';toast('Nu-kaart gedeeld met de groep');
+  }catch(e){toast(errMsg(e))}
+  delete S.busy.nu;render();
+}
+async function deleteNu(id){
+  try{
+    for(const n of S.notes.filter(x=>x.spread==='nu__'+id)){
+      if(n.audio){for(let i=0;i<n.audio.parts;i++)await S.db.doc('audio/'+n.audio.id+'/parts/'+pad(i)).delete();delete audioCache[n.audio.id]}
+      await S.db.doc('notes/'+n.id).delete();
+    }
+    await S.db.doc('nukaarten/'+id).delete();toast('Verwijderd');
+  }catch(e){toast(errMsg(e))}
+}
+function nuComposer(){
+  const n=S.nu,drawn=!!(n.hidden||n.card);
+  let h='<section class="panel stack"><div class="stack" style="gap:2px"><span class="label">Nu-kaart</span><h2>Een kaart voor dit moment</h2></div>'
+   +'<p class="muted small">Een Nu-kaart is een losse kaart tussen de nieuwe manen door. Trek hem als je even wilt weten wat er nu speelt. De anderen kunnen hun lezing erbij delen.</p>'
+   +'<div class="stack" style="gap:6px"><label class="label" for="n-int">Wat wil je erbij zeggen? (optioneel)</label>'
+   +'<textarea id="n-int" maxlength="300" placeholder="Bijvoorbeeld: Wat heb ik nu nodig?">'+esc(S.drafts['n-int']||'')+'</textarea>'
+   +'<span class="muted small">Dit hoeft niet. Wat je schrijft is zichtbaar voor iedereen in de groep.</span></div>'
+   +'<div class="row"><label class="row small" style="gap:6px"><input type="checkbox" data-chg="nurev" '+(n.rev?'checked ':'')+(drawn?'disabled':'')+'> Met omgekeerde kaarten</label></div>'
+   +'<div class="row"><button type="button" class="btn sm '+(n.mode==='digital'?'primary':'')+'" data-act="nu-mode" data-mode="digital" '+(drawn?'disabled':'')+'>Digitaal trekken</button>'
+   +'<button type="button" class="btn sm '+(n.mode==='eigen'?'primary':'')+'" data-act="nu-mode" data-mode="eigen" '+(drawn?'disabled':'')+'>Ik gebruik mijn eigen deck</button></div>';
+  if(n.card){
+    const c=BYID[n.card.id];
+    h+='<div class="nuhead"><button type="button" class="artbtn" data-act="card" data-card="'+c.id+'" data-rev="'+(n.card.rev?1:0)+'" data-pos="-1" aria-label="'+esc(c.nl)+' bekijken">'+artHtml(c,n.card.rev)+'</button>'
+     +'<div class="stack" style="gap:6px"><h2>'+esc(c.nl)+'</h2>'+(n.card.rev?'<span class="chip warn">omgekeerd</span>':'')+'<div class="row" style="gap:6px">'+c.kw.map(k=>'<span class="chip">'+esc(k)+'</span>').join('')+'</div><span class="muted small">Tik op de kaart voor de betekenis en de beeldtaal.</span></div></div>';
+    if(c.safety)h+='<div class="notice stop"><b>Veiligheidskaart: '+esc(c.nl)+'.</b> Deze kaart wijst je terug naar jezelf. Neem een moment voor jezelf voordat je verdergaat.</div>';
+  }else if(n.hidden){
+    h+='<div class="nuhead"><span class="artbtn"><span class="art back"></span></span><div class="stack" style="gap:8px"><p>Je kaart ligt gesloten klaar.</p><div><button type="button" class="btn primary" data-act="nu-flip">Draai om</button></div></div></div>';
+  }else{
+    h+='<div class="row">'+(n.mode==='digital'?'<button type="button" class="btn primary" data-act="nu-draw">Schud en trek een kaart</button>':'<button type="button" class="btn primary" data-act="pick-open" data-purpose="nu">Kaart invullen</button>')+'</div>';
+  }
+  h+='<div class="row">'+(n.card?'<button type="button" class="btn primary" data-act="nu-save" '+(S.busy.nu?'disabled':'')+'>'+(S.busy.nu?'Bewaren…':'Deel met de groep')+'</button>':'')+(drawn?'<button type="button" class="btn sm ghost" data-act="nu-reset">Opnieuw beginnen</button>':'')+'</div></section>';
+  return h;
+}
+function nuCard(doc){
+  const sid='nu__'+doc.id,mine=doc.uid===S.uid,c=BYID[doc.card&&doc.card.id],owner=nameOf(doc.uid);
+  if(!c)return '';
+  const rev=!!doc.card.rev;
+  let h='<section class="panel"><div class="row between"><div class="stack" style="gap:2px"><span class="label">'+(mine?'Jouw Nu-kaart':'Nu-kaart van '+esc(owner))+'</span><span class="muted small">'+esc(fmtTime(doc.at))+'</span></div>'
+   +(mine?'<button type="button" class="btn sm ghost danger" data-act="nu-del" data-id="'+esc(doc.id)+'">'+(S.confirm==='nu'+doc.id?'Zeker? Tik nogmaals':'Verwijder')+'</button>':'')+'</div>';
+  if(doc.question)h+='<div class="quote">'+esc(doc.question)+'</div>';
+  h+='<div class="nuhead"><button type="button" class="artbtn" data-act="card" data-card="'+c.id+'" data-rev="'+(rev?1:0)+'" data-pos="-1" aria-label="'+esc(c.nl)+' bekijken">'+artHtml(c,rev)+'</button>'
+   +'<div class="stack" style="gap:6px"><h2>'+esc(c.nl)+'</h2>'+(rev?'<span class="chip warn">omgekeerd</span>':'')+'<div class="row" style="gap:6px">'+c.kw.map(k=>'<span class="chip">'+esc(k)+'</span>').join('')+'</div><p class="small">'+esc(rev?c.rev:c.up)+'</p></div></div>';
+  const own=notesOf(sid,'own');
+  h+='<div class="stack"><span class="label">Eigen interpretatie</span>'+(own.length?own.map(noteHtml).join(''):'<p class="muted small">Nog geen interpretatie toegevoegd.</p>');
+  if(mine)h+=noteForm('own',sid,'Wat zie jij in deze kaart? Tekst en audio zijn allebei optioneel.','Bewaar interpretatie');
+  h+='</div>';
+  const rd=notesOf(sid,'reading');
+  h+='<div class="stack"><span class="label">Lezingen van de anderen</span>'+(rd.length?rd.map(noteHtml).join(''):'<p class="muted small">Nog geen lezingen. De anderen nemen een audionoot op.</p>');
+  if(!mine)h+=noteForm('reading',sid,'Vertel wat je ziet in deze kaart voor '+owner+'. Neem een audionoot op, tekst erbij mag.','Bewaar lezing',true);
+  h+='</div>';
+  const pt=notesOf(sid,'point');
+  h+='<div class="stack"><span class="label">Aanvullingen</span>'+(pt.length?pt.map(noteHtml).join(''):'<p class="muted small">Nog geen aanvullingen.</p>');
+  if(!mine)h+=noteForm('point',sid,'Kort en puntig: wat valt je op?','Plaats aanvulling');
+  return h+'</div></section>';
+}
+function nuView(){
+  const gate=needDb();if(gate)return gate;
+  if(!me())return '<div class="panel"><h2>Nu-kaart</h2><p>Meld je eerst aan op het tabblad Maanlegging, dan kun je meedoen.</p></div>';
+  const docs=S.nuDocs.slice().sort((a,b)=>(b.at||0)-(a.at||0)),show=docs.slice(0,S.nuShow);
+  return '<div class="stack">'+nuComposer()+(docs.length?'':'<p class="muted small" style="text-align:center">Er zijn nog geen Nu-kaarten gedeeld.</p>')+show.map(nuCard).join('')
+   +(docs.length>show.length?'<div class="row" style="justify-content:center"><button type="button" class="btn" data-act="nu-more">Toon oudere Nu-kaarten</button></div>':'')+'</div>';
+}
+
 function groepView(){
   const gate=needDb();if(gate)return gate;
   const ms=members();
   let h='<div class="stack"><h1 style="font-size:22px">Groep</h1><section class="panel"><span class="label">Deelnemers · '+ms.length+' van 4</span><ul class="hw">'
    +ms.map((m,i)=>'<li><span>'+(i+1)+'. '+esc(m.name)+(m.id===S.uid?' <span class="chip">jij</span>':'')+'</span></li>').join('')+'</ul>'
-   +(ms.length<4?'<p class="muted small">Nog '+(4-ms.length)+' plek'+(4-ms.length===1?'':'ken')+' vrij. Elke deelnemer meldt zich één keer aan op het tabblad Legging.</p>':'')+'</section>';
+   +(ms.length<4?'<p class="muted small">Nog '+(4-ms.length)+' plek'+(4-ms.length===1?'':'ken')+' vrij. Elke deelnemer meldt zich één keer aan op het tabblad Maanlegging.</p>':'')+'</section>';
   h+=moonPanel();
   if(me())h+='<section class="panel"><label class="label" for="rename">Naam aanpassen</label><input type="text" id="rename" maxlength="30" value="'+esc(S.drafts['rename']!=null?S.drafts['rename']:me().name)+'"><div class="row"><button type="button" class="btn sm" data-act="rename">Bewaar naam</button></div></section>';
   if(S.sb)h+='<section class="panel"><div class="row between"><span class="small muted">Ingelogd</span><button type="button" class="btn sm" data-act="signout">Uitloggen</button></div></section>';
   if(ms.length){
     const now=new Date(),rows=[];
     for(let i=0;i<6;i++){const k=monthKey(new Date(now.getFullYear(),now.getMonth()+i,1));rows.push('<li><span>'+esc(monthLabel(k))+'</span><b>'+esc(nameOf(spotlightOf(k)))+'</b></li>')}
-    h+='<section class="panel"><span class="label">Spotlight de komende maanden</span><ul class="hw">'+rows.join('')+'</ul><p class="muted small">De volgorde volgt de aanmeldvolgorde. Je kunt de spotlight per maand wijzigen op het tabblad Legging.</p></section>';
+    h+='<section class="panel"><span class="label">Spotlight de komende maanden</span><ul class="hw">'+rows.join('')+'</ul><p class="muted small">De volgorde volgt de aanmeldvolgorde. Je kunt de spotlight per maand wijzigen op het tabblad Maanlegging.</p></section>';
   }
   return h+'</div>';
 }
@@ -957,8 +1034,8 @@ function sheetView(){
     const q=(S.drafts['pick-q']||'').trim().toLowerCase();
     const used=new Set(s.purpose==='next'?S.draft.revealed.map(x=>x.id):[]);
     const list=ALL.filter(c=>!used.has(c.id)&&(!q||(c.nl+' '+c.en+' '+(c.suit||'')+' '+c.kw.join(' ')).toLowerCase().includes(q)));
-    const allowRev=s.purpose==='next'?S.draft.rev:!!(S.spreads[s.spread]&&S.spreads[s.spread].reversals);
-    const title=s.purpose==='next'?'Kaart '+(S.draft.revealed.length+1)+' · '+POS[S.draft.revealed.length].name:'Verduidelijkingskaart';
+    const allowRev=s.purpose==='nu'?S.nu.rev:s.purpose==='next'?S.draft.rev:!!(S.spreads[s.spread]&&S.spreads[s.spread].reversals);
+    const title=s.purpose==='nu'?'Je Nu-kaart':s.purpose==='next'?'Kaart '+(S.draft.revealed.length+1)+' · '+POS[S.draft.revealed.length].name:'Verduidelijkingskaart';
     return '<div class="sheetbox" role="dialog" aria-modal="true" aria-label="Kaart kiezen"><h2>'+esc(title)+'</h2>'
      +'<input type="search" id="pick-q" placeholder="Zoek je kaart" value="'+esc(S.drafts['pick-q']||'')+'">'
      +(allowRev?'<label class="row small" style="gap:6px"><input type="checkbox" data-chg="pickrev" '+(s.rev?'checked':'')+'> De kaart ligt omgekeerd</label>':'')
@@ -971,7 +1048,9 @@ function sheetView(){
 /* ---------- acties ---------- */
 function pickCard(id){
   const s=S.sheet,c=BYID[id];if(!c)return;
-  if(s.purpose==='next'){
+  if(s.purpose==='nu'){
+    S.nu.card={id,rev:!!(S.nu.rev&&s.rev)};
+  }else if(s.purpose==='next'){
     const d=S.draft;d.revealed.push({id,rev:!!(d.rev&&s.rev)});if(c.safety)d.stopped=true;
   }else{
     const sp=S.spreads[s.spread];setClar(s.spread,s.idx,c,!!(sp&&sp.reversals&&s.rev));
@@ -982,6 +1061,15 @@ function act(a,t){
   const d=t.dataset;
   switch(a){
     case 'tab':S.tab=d.tab;window.scrollTo(0,0);break;
+    case 'nu-mode':S.nu.mode=d.mode;break;
+    case 'nu-draw':{const c=ALL[rndInt(ALL.length)];S.nu.hidden={id:c.id,rev:S.nu.rev&&rndBool()};break}
+    case 'nu-flip':S.nu.card=S.nu.hidden;S.nu.hidden=null;break;
+    case 'nu-reset':S.nu={mode:S.nu.mode,rev:S.nu.rev,hidden:null,card:null};break;
+    case 'nu-save':saveNu();return;
+    case 'nu-more':S.nuShow+=5;break;
+    case 'nu-del':
+      if(S.confirm==='nu'+d.id){S.confirm=null;deleteNu(d.id)}else{S.confirm='nu'+d.id;clearTimeout(act.t);act.t=setTimeout(()=>{S.confirm=null;render()},4000)}
+      break;
     case 'quiz-start':quizStart();break;
     case 'quiz-pick':quizAnswer(+d.i);break;
     case 'moon-ics':downloadMoonIcs();break;
@@ -1045,6 +1133,7 @@ document.addEventListener('change',e=>{
   const c=el.dataset&&el.dataset.chg;if(!c)return;
   if(c==='spot')setSpotlight(el.value);
   else if(c==='rev'){S.draft.rev=el.checked;render()}
+  else if(c==='nurev'){S.nu.rev=el.checked;render()}
   else if(c==='pickrev'){S.sheet.rev=el.checked;render()}
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.sheet){S.sheet=null;render()}});
@@ -1119,6 +1208,7 @@ async function boot(){
   db.collection('members').onSnapshot(sn=>{S.members=sn.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0)||(a.id<b.id?-1:1));S.ready.members=true;render()},fail);
   db.collection('months').onSnapshot(sn=>{S.months={};sn.docs.forEach(d=>S.months[d.id]=d.data());render()},fail);
   db.collection('spreads').onSnapshot(sn=>{S.spreads={};sn.docs.forEach(d=>S.spreads[d.id]=d.data());S.ready.spreads=true;render()},fail);
+  db.collection('nukaarten').onSnapshot(sn=>{S.nuDocs=sn.docs.map(d=>Object.assign({id:d.id},d.data()));render()},fail);
   db.collection('quiz').onSnapshot(sn=>{S.quizDocs=sn.docs.map(d=>Object.assign({id:d.id},d.data()));render()},fail);
   db.collection('notes').onSnapshot(sn=>{S.notes=sn.docs.map(d=>Object.assign({id:d.id},d.data()));S.ready.notes=true;render()},fail);
 }
