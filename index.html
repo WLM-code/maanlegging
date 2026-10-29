@@ -81,6 +81,10 @@ textarea{min-height:88px;resize:vertical}
 .foot{font-size:12px;color:var(--ink);text-align:center;margin:6px 0 0}
 .recdot{color:#c4372c;animation:blink 1s infinite}
 @keyframes blink{50%{opacity:.25}}
+.seg{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.seglbl{font-family:var(--font-head);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-right:2px}
+.segbtn{background:transparent;border:1.5px solid var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;line-height:1.4;color:var(--ink)}
+.segbtn[aria-pressed="true"]{background:var(--ink);color:var(--cream);font-weight:700}
 .nuhead{display:flex;gap:14px;align-items:flex-start}
 .nuhead .artbtn{width:112px;flex:none;background:none;border:0;padding:0;display:block}
 .nuhead .artbtn .art{width:100%}
@@ -389,7 +393,7 @@ function errMsg(e){const c=e&&e.code;if(c==='invalid_argument')return 'Opslaan l
 
 /* ---------- toestand ---------- */
 const S={db:null,user:null,uid:null,myName:'',canWrite:null,noDb:false,sb:null,sbCfg:!!(window.SB_CONFIG&&window.SB_CONFIG.url&&window.SB_CONFIG.key),authMode:'in',authMsg:'',authBusy:false,
-  ready:{members:false,spreads:false,notes:false},quizDocs:[],quizFeed:null,nuDocs:[],nu:{mode:'digital',rev:false,hidden:null,card:null},nuShow:5,
+  ready:{members:false,spreads:false,notes:false},quizDocs:[],quizFeed:null,nuDocs:[],nuFilter:'all',nu:{mode:'digital',rev:false,hidden:null,card:null},nuShow:5,
   members:[],months:{},spreads:{},notes:[],deckimg:{},
   tab:'maand',month:monthKey(new Date()),filter:'alle',q:'',
   draft:freshDraft(),redo:{},drafts:{},files:{},busy:{},sheet:null,confirm:null,toast:'',reversals:false};
@@ -1064,8 +1068,14 @@ function nuCard(doc){
 function nuView(){
   const gate=needDb();if(gate)return gate;
   if(!me())return '<div class="panel"><h2>Nu-kaart</h2><p>Meld je eerst aan op het tabblad Maanlegging, dan kun je meedoen.</p></div>';
-  const docs=S.nuDocs.slice().sort((a,b)=>(b.at||0)-(a.at||0)),show=docs.slice(0,S.nuShow);
-  return '<div class="stack">'+nuComposer()+(docs.length?'':'<p class="muted small" style="text-align:center">Er zijn nog geen Nu-kaarten gedeeld.</p>')+show.map(nuCard).join('')
+  const all=S.nuDocs.slice().sort((a,b)=>(b.at||0)-(a.at||0));
+  if(S.nuFilter!=='all'&&!memberOf(S.nuFilter))S.nuFilter='all';
+  const docs=S.nuFilter==='all'?all:all.filter(d=>d.uid===S.nuFilter),show=docs.slice(0,S.nuShow);
+  const seg=all.length?'<div class="seg" role="group" aria-label="Welke Nu-kaarten wil je zien?"><span class="seglbl">Toon</span>'
+    +'<button type="button" class="segbtn" data-act="nu-filter" data-f="all" aria-pressed="'+(S.nuFilter==='all')+'">Iedereen</button>'
+    +members().map(m=>'<button type="button" class="segbtn" data-act="nu-filter" data-f="'+esc(m.id)+'" aria-pressed="'+(S.nuFilter===m.id)+'">'+(m.id===S.uid?'Mijn kaarten':esc(m.name))+'</button>').join('')+'</div>':'';
+  const empty=all.length===0?'Er zijn nog geen Nu-kaarten gedeeld.':(docs.length===0?'Nog geen Nu-kaarten van '+esc(nameOf(S.nuFilter))+'.':'');
+  return '<div class="stack">'+nuComposer()+seg+(empty?'<p class="muted small" style="text-align:center">'+empty+'</p>':'')+show.map(nuCard).join('')
    +(docs.length>show.length?'<div class="row" style="justify-content:center"><button type="button" class="btn" data-act="nu-more">Toon oudere Nu-kaarten</button></div>':'')+'</div>';
 }
 
@@ -1141,6 +1151,7 @@ function act(a,t){
     case 'tab':S.tab=d.tab;window.scrollTo(0,0);break;
     case 'rec-start':recStart(d.key);return;
     case 'rec-stop':recUserStop();return;
+    case 'nu-filter':S.nuFilter=d.f;S.nuShow=5;break;
     case 'nu-mode':S.nu.mode=d.mode;break;
     case 'nu-draw':{const c=ALL[rndInt(ALL.length)];S.nu.hidden={id:c.id,rev:S.nu.rev&&rndBool()};break}
     case 'nu-flip':S.nu.card=S.nu.hidden;S.nu.hidden=null;break;
