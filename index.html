@@ -87,6 +87,8 @@ textarea{min-height:88px;resize:vertical}
 button.who{background:none;border:0;padding:0;color:var(--green-text);font-size:14px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
 button.who[aria-current="true"]{text-decoration:underline}
 .qimg{width:150px;margin:0 auto}
+.qimg .art{aspect-ratio:300/446;position:relative;background:var(--cream)}
+.qimg .art img{position:absolute;top:0;left:0;width:100%;height:auto;object-fit:initial}
 .qtext{font-size:18px}
 .qopts{display:flex;flex-direction:column;gap:8px}
 .qopt{text-align:left;background:var(--paper);border:1.5px solid var(--ink);border-radius:10px;padding:11px 14px;font-size:15px;line-height:1.35}
@@ -516,17 +518,22 @@ async function recStart(key){
   rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
   rec.onstop=async()=>{
     stream.getTracks().forEach(t=>t.stop());
-    const r=S.rec;if(r)clearInterval(r.iv);S.rec=null;
+    const r=S.rec;if(r){clearInterval(r.iv);try{if(r.wl)r.wl.release()}catch(e){}}S.rec=null;
+    if(r&&!r.user&&(Date.now()-r.t0)<(REC_MAX-2)*1000)toast('De opname stopte vanzelf, waarschijnlijk door het vergrendelen van je scherm. Het deel tot dat moment is bewaard.');
     const type=(rec.mimeType||mime||'audio/mp4').split(';')[0],ext=type.includes('mp4')?'m4a':type.includes('webm')?'webm':'ogg';
     let file=new File([new Blob(chunks,{type:rec.mimeType||mime||'audio/mp4'})],'opname.'+ext,{type});
     if(/opus|webm|ogg/.test(rec.mimeType||type)||!/mp4|mpeg/.test(type)){S.busy['rec-'+key]=true;render();try{file=await toMp3(file,()=>{})}catch(e){} delete S.busy['rec-'+key]}
     S.files['f-'+key]=file;render();
   };
   const t0=Date.now();
-  S.rec={key,t0,rec,iv:setInterval(()=>{const n=Math.floor((Date.now()-t0)/1000),el=document.getElementById('rec-time');if(el)el.textContent=mmss(n);if(n>=REC_MAX)recStop()},250)};
+  let wl=null;try{if(navigator.wakeLock)wl=await navigator.wakeLock.request('screen')}catch(e){}
+  const tr=stream.getAudioTracks()[0];if(tr)tr.onended=()=>{if(S.rec&&!S.rec.user){recStop()}};
+  S.rec={key,t0,rec,wl,user:false,iv:setInterval(()=>{const n=Math.floor((Date.now()-t0)/1000),el=document.getElementById('rec-time');if(el)el.textContent=mmss(n);if(n>=REC_MAX){if(S.rec)S.rec.user=true;recStop()}},250)};
   rec.start(1000);render();
 }
 function recStop(){const r=S.rec;if(r&&r.rec&&r.rec.state!=='inactive')r.rec.stop()}
+function recUserStop(){if(S.rec)S.rec.user=true;recStop()}
+document.addEventListener('visibilitychange',async()=>{const r=S.rec;if(r&&document.visibilityState==='visible'&&navigator.wakeLock&&(!r.wl||r.wl.released)){try{r.wl=await navigator.wakeLock.request('screen')}catch(e){}}});
 
 const audioCache={};
 async function loadAudio(a){
@@ -788,7 +795,7 @@ function noteHtml(n){
 }
 
 function audioRow(key,f,busy){
-  if(S.rec&&S.rec.key===key)return '<span class="recdot" aria-hidden="true">●</span> <b id="rec-time">0:00</b><span class="muted small"> van 5:00</span> <button type="button" class="btn sm primary" data-act="rec-stop">Stop</button>';
+  if(S.rec&&S.rec.key===key)return '<span class="recdot" aria-hidden="true">●</span> <b id="rec-time">0:00</b><span class="muted small"> van 5:00</span> <button type="button" class="btn sm primary" data-act="rec-stop">Stop</button><span class="muted small" style="flex-basis:100%">Laat je scherm aan tijdens het opnemen. Als je scherm vergrendelt, stopt de opname.</span>';
   if(S.busy['rec-'+key])return '<span class="muted small">Opname verwerken…</span>';
   let h='<button type="button" class="btn sm" data-act="rec-start" data-key="'+key+'" '+(busy||S.rec?'disabled':'')+'>🎙 Opnemen</button>'
    +'<label class="btn sm filebtn"><input type="file" id="f-'+key+'" accept="audio/*,video/*,.m4a,.mp3,.wav,.aac,.ogg,.webm,.mov,.mp4" data-file="1" '+(busy||S.rec?'disabled':'')+'>📎 '+(f?'Ander bestand':'Kies audio of video')+'</label>';
@@ -1133,7 +1140,7 @@ function act(a,t){
   switch(a){
     case 'tab':S.tab=d.tab;window.scrollTo(0,0);break;
     case 'rec-start':recStart(d.key);return;
-    case 'rec-stop':recStop();return;
+    case 'rec-stop':recUserStop();return;
     case 'nu-mode':S.nu.mode=d.mode;break;
     case 'nu-draw':{const c=ALL[rndInt(ALL.length)];S.nu.hidden={id:c.id,rev:S.nu.rev&&rndBool()};break}
     case 'nu-flip':S.nu.card=S.nu.hidden;S.nu.hidden=null;break;
