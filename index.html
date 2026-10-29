@@ -79,6 +79,8 @@ textarea{min-height:88px;resize:vertical}
 .slot .pos{display:flex;gap:6px;align-items:flex-start;font-family:var(--font-head);font-size:11.5px;line-height:1.25;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);font-weight:500;min-height:30px}
 .slot .pos b{flex:none;width:19px;height:19px;border-radius:50%;background:var(--ribbon);color:var(--ink);display:grid;place-items:center;font-size:11px;font-family:var(--font-body);font-weight:800}
 .foot{font-size:12px;color:var(--ink);text-align:center;margin:6px 0 0}
+.recdot{color:#c4372c;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.25}}
 .nuhead{display:flex;gap:14px;align-items:flex-start}
 .nuhead .artbtn{width:112px;flex:none;background:none;border:0;padding:0;display:block}
 .nuhead .artbtn .art{width:100%}
@@ -468,6 +470,64 @@ async function saveAudio(file,onProgress){
   for(let i=0;i<parts;i++){await setWithRetry(S.db.doc('audio/'+id+'/parts/'+pad(i)),{i,d:b64.slice(i*CHUNK,(i+1)*CHUNK)});onProgress(i+1,parts)}
   return {id,mime:guessMime(file),parts,size:file.size};
 }
+
+/* ---------- audio opnemen en klein maken ---------- */
+const REC_MAX=300;
+const sizeLbl=b=>b<1048576?Math.max(1,Math.round(b/1024))+' KB':(b/1048576).toFixed(1)+' MB';
+const mmss=n=>Math.floor(n/60)+':'+String(n%60).padStart(2,'0');
+function pickRecMime(){const c=['audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus'];return c.find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t))||''}
+let lameP=null;
+function loadLame(){if(window.lamejs)return Promise.resolve();return lameP||(lameP=loadScript('https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js'))}
+async function toMp3(file,onStatus){
+  onStatus('Audio verkleinen…');
+  await loadLame();
+  const ab=await file.arrayBuffer(),AC=window.AudioContext||window.webkitAudioContext,ctx=new AC();
+  const buf=await new Promise((res,rej)=>{try{const p=ctx.decodeAudioData(ab,res,rej);if(p&&p.catch)p.catch(rej)}catch(e){rej(e)}});
+  try{ctx.close()}catch(e){}
+  if(buf.duration>REC_MAX+30)throw new Error('Deze opname is te lang. Maximaal 5 minuten per lezing.');
+  const RATE=22050,OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext,off=new OAC(1,Math.ceil(buf.duration*RATE),RATE),src=off.createBufferSource();
+  src.buffer=buf;src.connect(off.destination);src.start();
+  const rendered=await new Promise((res,rej)=>{try{const p=off.startRendering();if(p&&p.then)p.then(res,rej);else off.oncomplete=e=>res(e.renderedBuffer)}catch(e){rej(e)}});
+  const f=rendered.getChannelData(0),pcm=new Int16Array(f.length);
+  for(let i=0;i<f.length;i++){const v=Math.max(-1,Math.min(1,f[i]));pcm[i]=v<0?v*0x8000:v*0x7FFF}
+  const enc=new lamejs.Mp3Encoder(1,RATE,32),out=[];
+  for(let i=0;i<pcm.length;i+=1152){const b=enc.encodeBuffer(pcm.subarray(i,i+1152));if(b.length)out.push(new Uint8Array(b));if(i%(1152*400)===0)await new Promise(r=>setTimeout(r,0))}
+  const end=enc.flush();if(end.length)out.push(new Uint8Array(end));
+  return new File([new Blob(out,{type:'audio/mpeg'})],(file.name||'opname').replace(/\.[^.]+$/,'')+'.mp3',{type:'audio/mpeg'});
+}
+async function prepAudio(file,onStatus){
+  const isVid=/^video\//.test(file.type)||/\.(mov|mp4v|m4v)$/i.test(file.name),oddType=/webm|ogg|opus/.test(file.type||''),big=file.size>1.5*1048576;
+  if(!(isVid||oddType||big))return file;
+  try{const f=await toMp3(file,onStatus);return f}catch(e){
+    if(/te lang/.test(e.message))throw e;
+    if(!isVid&&file.size<=MAX_AUDIO)return file;
+    throw new Error('Dit bestand kon niet worden verkleind. Neem je lezing op met de knop Opnemen, of kies een korter bestand.');
+  }
+}
+const fileUrls=new WeakMap();
+function previewUrl(f){let u=fileUrls.get(f);if(!u){u=URL.createObjectURL(f);fileUrls.set(f,u)}return u}
+async function recStart(key){
+  if(S.rec)return;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){toast('Opnemen lukt niet in deze browser. Gebruik Kies audio of video.');return}
+  let stream;
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}})}catch(e){toast('Geen toegang tot je microfoon. Sta de microfoon toe in je browser en probeer opnieuw.');return}
+  const mime=pickRecMime(),chunks=[];let rec;
+  try{rec=new MediaRecorder(stream,Object.assign({audioBitsPerSecond:32000},mime?{mimeType:mime}:{}))}catch(e){stream.getTracks().forEach(t=>t.stop());toast('Opnemen lukt niet op dit toestel.');return}
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  rec.onstop=async()=>{
+    stream.getTracks().forEach(t=>t.stop());
+    const r=S.rec;if(r)clearInterval(r.iv);S.rec=null;
+    const type=(rec.mimeType||mime||'audio/mp4').split(';')[0],ext=type.includes('mp4')?'m4a':type.includes('webm')?'webm':'ogg';
+    let file=new File([new Blob(chunks,{type:rec.mimeType||mime||'audio/mp4'})],'opname.'+ext,{type});
+    if(/opus|webm|ogg/.test(rec.mimeType||type)||!/mp4|mpeg/.test(type)){S.busy['rec-'+key]=true;render();try{file=await toMp3(file,()=>{})}catch(e){} delete S.busy['rec-'+key]}
+    S.files['f-'+key]=file;render();
+  };
+  const t0=Date.now();
+  S.rec={key,t0,rec,iv:setInterval(()=>{const n=Math.floor((Date.now()-t0)/1000),el=document.getElementById('rec-time');if(el)el.textContent=mmss(n);if(n>=REC_MAX)recStop()},250)};
+  rec.start(1000);render();
+}
+function recStop(){const r=S.rec;if(r&&r.rec&&r.rec.state!=='inactive')r.rec.stop()}
+
 const audioCache={};
 async function loadAudio(a){
   if(audioCache[a.id])return audioCache[a.id];
@@ -527,7 +587,9 @@ async function saveNote(kind,sid){
   S.busy[key]='Bezig…';render();
   try{
     let audio=null;
-    if(file)audio=await saveAudio(file,(i,n)=>{S.busy[key]='Audio uploaden '+i+'/'+n;render()});
+    let f2=file;
+    if(file)f2=await prepAudio(file,m=>{S.busy[key]=m;render()});
+    if(f2)audio=await saveAudio(f2,(i,n)=>{S.busy[key]='Audio uploaden '+i+'/'+n;render()});
     await S.db.collection('notes').add({spread:sid,author:S.uid,kind,text:text.slice(0,2000),audio,at:Date.now()});
     S.drafts['t-'+key]='';delete S.files['f-'+key];toast('Bewaard');
   }catch(e){toast(errMsg(e))}
@@ -707,7 +769,7 @@ function spreadCard(sp,isSpot){
   if(isSpot){
     const rd=notesOf(sid,'reading');
     h+='<div class="stack"><span class="label">Waarzeggingen van de anderen</span>'+(rd.length?rd.map(noteHtml).join(''):'<p class="muted small">Nog geen waarzeggingen. De andere drie nemen elk een verhaal op als audionoot.</p>');
-    if(!mineSp)h+=noteForm('reading',sid,'Vertel wat je ziet in deze legging. Neem een audionoot op, tekst erbij mag.','Bewaar waarzegging',true);
+    if(!mineSp)h+=noteForm('reading',sid,'Vertel wat je ziet in deze legging. Neem tot 5 minuten op met de knop Opnemen, tekst erbij mag.','Bewaar waarzegging',true);
     h+='</div>';
   }
   const pt=notesOf(sid,'point');
@@ -724,11 +786,20 @@ function noteHtml(n){
    +(n.text?'<p>'+esc(n.text)+'</p>':'')
    +(n.audio?'<div><button type="button" class="btn sm" data-act="play" data-id="'+esc(n.id)+'">▶ Luister · '+(n.audio.size/1048576).toFixed(1)+' MB</button></div>':'')+'</article>';
 }
+
+function audioRow(key,f,busy){
+  if(S.rec&&S.rec.key===key)return '<span class="recdot" aria-hidden="true">●</span> <b id="rec-time">0:00</b><span class="muted small"> van 5:00</span> <button type="button" class="btn sm primary" data-act="rec-stop">Stop</button>';
+  if(S.busy['rec-'+key])return '<span class="muted small">Opname verwerken…</span>';
+  let h='<button type="button" class="btn sm" data-act="rec-start" data-key="'+key+'" '+(busy||S.rec?'disabled':'')+'>🎙 Opnemen</button>'
+   +'<label class="btn sm filebtn"><input type="file" id="f-'+key+'" accept="audio/*,video/*,.m4a,.mp3,.wav,.aac,.ogg,.webm,.mov,.mp4" data-file="1" '+(busy||S.rec?'disabled':'')+'>📎 '+(f?'Ander bestand':'Kies audio of video')+'</label>';
+  if(f)h+='<span class="small">'+esc(f.name)+' · '+sizeLbl(f.size)+'</span><audio controls preload="metadata" src="'+previewUrl(f)+'" style="width:100%;margin-top:6px"></audio>';
+  return h;
+}
 function noteForm(kind,sid,hint,btn,needAudio){
   const key=kind+'-'+sid,f=S.files['f-'+key],busy=S.busy[key],showAudio=kind!=='point';
   return '<div class="stack" style="gap:8px;margin-top:4px"><p class="muted small">'+esc(hint)+'</p>'
    +'<textarea id="t-'+key+'" '+(kind==='point'?'maxlength="280" style="min-height:56px"':'maxlength="2000"')+' placeholder="Tekst'+(needAudio?' (optioneel)':'')+'" '+(busy?'disabled':'')+'>'+esc(S.drafts['t-'+key]||'')+'</textarea>'
-   +'<div class="row">'+(showAudio?'<label class="btn sm filebtn"><input type="file" id="f-'+key+'" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.webm" data-file="1" '+(busy?'disabled':'')+'>🎙 '+(f?'Ander audiobestand':'Audio toevoegen')+'</label>'+(f?'<span class="small">'+esc(f.name)+' · '+(f.size/1048576).toFixed(1)+' MB</span>':''):'')
+   +'<div class="row">'+(showAudio?audioRow(key,f,busy):'')
    +'<button type="button" class="btn primary sm" data-act="note-save" data-kind="'+kind+'" data-spread="'+sid+'" '+(busy?'disabled':'')+'>'+esc(busy||btn)+'</button></div></div>';
 }
 
@@ -976,7 +1047,7 @@ function nuCard(doc){
   h+='</div>';
   const rd=notesOf(sid,'reading');
   h+='<div class="stack"><span class="label">Lezingen van de anderen</span>'+(rd.length?rd.map(noteHtml).join(''):'<p class="muted small">Nog geen lezingen. De anderen nemen een audionoot op.</p>');
-  if(!mine)h+=noteForm('reading',sid,'Vertel wat je ziet in deze kaart voor '+owner+'. Neem een audionoot op, tekst erbij mag.','Bewaar lezing',true);
+  if(!mine)h+=noteForm('reading',sid,'Vertel wat je ziet in deze kaart voor '+owner+'. Neem tot 5 minuten op met de knop Opnemen, tekst erbij mag.','Bewaar lezing',true);
   h+='</div>';
   const pt=notesOf(sid,'point');
   h+='<div class="stack"><span class="label">Aanvullingen</span>'+(pt.length?pt.map(noteHtml).join(''):'<p class="muted small">Nog geen aanvullingen.</p>');
@@ -1061,6 +1132,8 @@ function act(a,t){
   const d=t.dataset;
   switch(a){
     case 'tab':S.tab=d.tab;window.scrollTo(0,0);break;
+    case 'rec-start':recStart(d.key);return;
+    case 'rec-stop':recStop();return;
     case 'nu-mode':S.nu.mode=d.mode;break;
     case 'nu-draw':{const c=ALL[rndInt(ALL.length)];S.nu.hidden={id:c.id,rev:S.nu.rev&&rndBool()};break}
     case 'nu-flip':S.nu.card=S.nu.hidden;S.nu.hidden=null;break;
