@@ -85,6 +85,13 @@ textarea{min-height:88px;resize:vertical}
 .seglbl{font-family:var(--font-head);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-right:2px}
 .segbtn{background:transparent;border:1.5px solid var(--ink);border-radius:999px;padding:4px 12px;font-size:13px;line-height:1.4;color:var(--ink)}
 .segbtn[aria-pressed="true"]{background:var(--ink);color:var(--cream);font-weight:700}
+.wins{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.wins li{display:flex;gap:12px;align-items:flex-start;background:var(--cream);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px}
+.wmoon{font-size:22px;line-height:1.2}
+.wbody{display:flex;flex-direction:column;gap:1px;min-width:0}
+.wrange{font-family:var(--font-head);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
+.wname{font-size:17px}
+.wpts{font-size:13px;color:var(--green-text);font-weight:700}
 .nuhead{display:flex;gap:14px;align-items:flex-start}
 .nuhead .artbtn{width:112px;flex:none;background:none;border:0;padding:0;display:block}
 .nuhead .artbtn .art{width:100%}
@@ -911,12 +918,36 @@ function dailyQuestions(day){
   return types.map(t=>makeQuestion(t,rnd));
 }
 const quizId=(day,uid)=>day+'__'+uid;
+/* score per maan: van nieuwe maan tot nieuwe maan */
+function cycleStarts(){
+  return newMoons(new Date(2026,6,1),40).map(d=>{const p=nlParts(d);return p.slice(0,4)+'-'+p.slice(4,6)+'-'+p.slice(6,8)}).filter((k,i,a)=>a.indexOf(k)===i).sort();
+}
+function cycleOf(day,starts){let c=null;for(const k of starts){if(k<=day)c=k;else break}return c}
+function addDays(key,n){const [y,m,d]=key.split('-').map(Number),x=new Date(Date.UTC(y,m-1,d+n));return x.toISOString().slice(0,10)}
+function dayLbl(key){const [y,m,d]=key.split('-').map(Number);return new Intl.DateTimeFormat('nl-NL',{day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(Date.UTC(y,m-1,d)))}
+function cycleRange(start,starts){const nx=starts[starts.indexOf(start)+1];return dayLbl(start)+(nx?' t/m '+dayLbl(addDays(nx,-1)):'')}
+function quizCycles(){
+  const starts=cycleStarts(),cur=cycleOf(dayKey(new Date()),starts),by={};
+  S.quizDocs.forEach(d=>{
+    const n=(d.answers||[]).length;if(!n||!d.date)return;
+    const c=cycleOf(d.date,starts);if(!c)return;
+    const m=by[c]=by[c]||{};m[d.uid]=(m[d.uid]||0)+(d.score||0);
+  });
+  return {starts,cur,by};
+}
 function quizTotals(){
-  const t={};
-  S.members.forEach(m=>t[m.id]={id:m.id,name:m.name,pts:0,days:0,today:0});
-  const today=dayKey(new Date());
-  S.quizDocs.forEach(d=>{const r=t[d.uid];if(!r)return;const n=(d.answers||[]).length;if(n===0)return;r.pts+=d.score||0;if(n>=3)r.days++;if(d.date===today)r.today=d.score||0});
-  return Object.values(t).sort((a,b)=>b.pts-a.pts||b.days-a.days||(a.name>b.name?1:-1));
+  const {starts,cur,by}=quizCycles(),today=dayKey(new Date()),t={};
+  S.members.forEach(m=>t[m.id]={id:m.id,name:m.name,pts:(by[cur]&&by[cur][m.id])||0,today:0});
+  S.quizDocs.forEach(d=>{const r=t[d.uid];if(r&&d.date===today&&(d.answers||[]).length)r.today=d.score||0});
+  return Object.values(t).sort((a,b)=>b.pts-a.pts||(a.name>b.name?1:-1));
+}
+function winnersList(){
+  const {starts,cur,by}=quizCycles();
+  return Object.keys(by).filter(c=>c!==cur&&c<cur).sort().reverse().map(c=>{
+    const rows=S.members.map(m=>({id:m.id,name:m.name,pts:by[c][m.id]||0})).filter(r=>r.pts>0).sort((a,b)=>b.pts-a.pts||(a.name>b.name?1:-1));
+    if(!rows.length)return null;
+    const top=rows[0].pts;return {c,range:cycleRange(c,starts),winners:rows.filter(r=>r.pts===top),rows};
+  }).filter(Boolean);
 }
 async function quizStart(){
   const day=dayKey(new Date());
@@ -930,8 +961,14 @@ async function quizAnswer(pick){
   try{await S.db.doc('quiz/'+doc.id).update({answers,score,at:Date.now()})}catch(e){S.quizFeed=null;toast(errMsg(e));render()}
 }
 function scoreboard(){
+  const {starts,cur}=quizCycles(),nx=starts[starts.indexOf(cur)+1];
   const rows=quizTotals().map((r,i)=>'<tr><th scope="row">'+(i+1)+'. '+esc(r.name)+(r.id===S.uid?' <span class="muted">(jij)</span>':'')+'</th><td>'+r.today+'</td><td><b>'+r.pts+'</b></td></tr>').join('');
-  return '<section class="panel"><span class="label">Scorebord</span><div class="scroll"><table class="t"><thead><tr><th>Deelnemer</th><th>Vandaag</th><th>Totaal</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="muted small">Elk goed antwoord is '+QPTS+' punten. Elke dag opnieuw spelen telt op.</p></section>';
+  let h='<section class="panel"><div class="stack" style="gap:2px"><span class="label">Score van deze maan</span>'+(cur?'<span class="muted small">'+esc(cycleRange(cur,starts))+'</span>':'')+'</div>'
+   +'<div class="scroll"><table class="t"><thead><tr><th>Deelnemer</th><th>Vandaag</th><th>Deze maan</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+   +'<p class="muted small">De punten tellen op tot de volgende nieuwe maan'+(nx?' ('+esc(dayLbl(nx))+')':'')+'. Daarna begint iedereen weer op nul.</p></section>';
+  const w=winnersList();
+  h+='<section class="panel stack"><span class="label">Winnaars per maan</span>'+(w.length?'<ul class="wins">'+w.map(x=>'<li><span class="wmoon">🌙</span><div class="wbody"><span class="wrange">'+esc(x.range)+'</span><b class="wname">🏆 '+x.winners.map(r=>esc(r.name)).join(' en ')+'</b><span class="wpts">'+x.winners[0].pts+' punten</span><span class="muted small">'+x.rows.map(r=>esc(r.name)+' '+r.pts).join(' · ')+'</span></div></li>').join('')+'</ul>':'<p class="muted small">Zodra een maan voorbij is, staat hier wie de meeste punten had.</p>')+'</section>';
+  return h;
 }
 function quizView(){
   const gate=needDb();if(gate)return gate;
