@@ -159,8 +159,21 @@ table.t th,table.t td{border-top:1px solid var(--line);padding:7px 8px 7px 0;tex
 .filebtn{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 .filebtn input{position:absolute;opacity:0;width:1px;height:1px}
 .filebtn:focus-within{outline:3px solid var(--purple);outline-offset:2px}
-@media (max-width:420px){.slot .pos span{font-size:10.5px}.nm{font-size:11.5px}.brand b{font-size:17px;letter-spacing:.22em}}
+@media (max-width:480px){.slot .pos{letter-spacing:0;gap:4px}.slot .pos span{font-size:9.5px;min-width:0;overflow-wrap:anywhere}}
+@media (max-width:420px){.slot .pos span{font-size:9.5px}.nm{font-size:11.5px}.brand b{font-size:17px;letter-spacing:.22em}}
 @media (prefers-reduced-motion: reduce){*{scroll-behavior:auto!important;transition:none!important}}
+.moonbar{display:flex;gap:14px;align-items:center;background:var(--paper);border-radius:var(--radius);padding:14px 16px;border-left:5px solid var(--ribbon);box-shadow:0 1px 0 rgba(34,48,74,.08);color:var(--ink)}
+.moonbar .mb-ico{font-size:38px;line-height:1;flex:none}
+.moonbar .mb-txt{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:14px}
+.moonbar .mb-txt b{font-family:var(--font-head);font-weight:500;font-size:17px;line-height:1.25}
+.moonbar .mb-sub{color:var(--ink-soft);font-size:13px}
+.moonbar .mb-ec{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.moonbar .chip{white-space:normal}
+.stars{color:var(--ribbon);letter-spacing:2px;font-size:16px}.stars .off{color:var(--line)}
+.starbtn{font-size:20px;line-height:1;padding:6px 10px}
+.starbtn[aria-pressed="true"]{color:#b98a00}
+.cicards{display:flex;gap:8px}.cicards>span{width:54px;display:block}
+.cilist{display:flex;flex-direction:column;gap:12px}.ciitem{display:flex;flex-direction:column;gap:4px;align-items:flex-start}.ciitem p{font-size:14px}
 </style>
 
 <div id="app"><div class="wrap"><p class="muted">Maanlegging wordt geladen…</p></div></div>
@@ -400,7 +413,7 @@ function errMsg(e){const c=e&&e.code;if(c==='invalid_argument')return 'Opslaan l
 
 /* ---------- toestand ---------- */
 const S={db:null,user:null,uid:null,myName:'',canWrite:null,noDb:false,sb:null,sbCfg:!!(window.SB_CONFIG&&window.SB_CONFIG.url&&window.SB_CONFIG.key),authMode:'in',authMsg:'',authBusy:false,
-  ready:{members:false,spreads:false,notes:false},quizDocs:[],quizFeed:null,nuDocs:[],nuFilter:'all',nu:{mode:'digital',rev:false,hidden:null,card:null},nuShow:5,
+  ready:{members:false,spreads:false,notes:false},quizDocs:[],quizFeed:null,nuDocs:[],nuFilter:'all',nu:{mode:'digital',rev:false,hidden:null,card:null},nuShow:5,checkins:[],ci:{val:0,fit:-1},ciEdit:null,push:{on:false,busy:false,err:'',prefs:{moon:true,reading:true,quiz:true,checkin:true}},
   members:[],months:{},spreads:{},notes:[],deckimg:{},
   tab:'maand',month:monthKey(new Date()),filter:'alle',q:'',
   draft:freshDraft(),redo:{},drafts:{},files:{},busy:{},sheet:null,confirm:null,toast:'',reversals:false};
@@ -432,8 +445,6 @@ const members=()=>S.members;
 const memberOf=id=>S.members.find(m=>m.id===id);
 const nameOf=id=>{const m=memberOf(id);return m?m.name:'Iemand'};
 const me=()=>memberOf(S.uid);
-function rotation(key){const [y,m]=key.split('-').map(Number),ms=members();if(!ms.length)return null;return ms[(y*12+(m-1))%ms.length].id}
-const spotlightOf=key=>(S.months[key]&&S.months[key].spotlight)||rotation(key);
 const spreadId=(key,uid)=>key+'__'+uid;
 const spreadsOf=key=>Object.values(S.spreads).filter(s=>s.month===key);
 const notesOf=(sid,kind)=>S.notes.filter(n=>n.spread===sid&&n.kind===kind).sort((a,b)=>a.at-b.at);
@@ -584,14 +595,45 @@ async function renameMe(){
   const name=(S.drafts['rename']||'').trim();if(name.length<2)return;
   try{await S.db.doc('members/'+S.uid).update({name:name.slice(0,30)});S.drafts['rename']='';toast('Naam aangepast')}catch(e){toast(errMsg(e))}
 }
-async function setSpotlight(uid){try{await S.db.doc('months/'+S.month).set({spotlight:uid,by:S.uid})}catch(e){toast(errMsg(e))}}
+/* leesopdrachten: iedereen leest de legging van een ander teamlid */
+const prevMonthKey=key=>{const [y,m]=key.split('-').map(Number);return monthKey(new Date(y,m-2,1))};
+function makeAssign(key,ids){
+  ids=ids.slice().sort();
+  const pa=(S.months[prevMonthKey(key)]&&S.months[prevMonthKey(key)].assign)||{};
+  let best=null;
+  for(let t=0;t<60;t++){
+    const order=shuf(ids,mulberry(hash('lees-'+key+'-'+t))),a={};
+    order.forEach((id,i)=>{a[id]=order[(i+1)%order.length]});
+    best=a;
+    if(ids.length<3||!ids.some(id=>pa[id]===a[id]))break;
+  }
+  return best;
+}
+function assignOf(key){
+  const ids=members().map(m=>m.id);
+  if(ids.length<2)return {};
+  const st=S.months[key]&&S.months[key].assign;
+  if(st&&ids.every(id=>st[id]&&ids.includes(st[id])&&st[id]!==id))return st;
+  return makeAssign(key,ids);
+}
+const readerOf=(key,subj)=>{const a=assignOf(key);return Object.keys(a).find(r=>a[r]===subj)||null};
+let assignBusy=false;
+async function ensureAssign(){
+  if(assignBusy||!S.db||!S.uid||S.canWrite===false||!me()||!(S.ready.members&&S.ready.months))return;
+  const key=monthKey(new Date()),ids=members().map(m=>m.id);
+  if(ids.length<2)return;
+  const st=S.months[key]&&S.months[key].assign;
+  if(st&&ids.every(id=>st[id]&&ids.includes(st[id])&&st[id]!==id))return;
+  assignBusy=true;
+  try{await S.db.doc('months/'+key).set(Object.assign({},S.months[key]||{},{assign:makeAssign(key,ids),by:S.uid}))}catch(e){}
+  assignBusy=false;
+}
 async function saveSpread(){
   const d=S.draft,intent=(S.drafts['d-int']||'').trim(),key=S.month;
   if(!(d.revealed.length===4||d.stopped)||!d.revealed.length){toast('Draai eerst je kaarten om.');return}
   const id=spreadId(key,S.uid),old=S.spreads[id];
   S.busy.save=true;render();
   try{
-    if(!(S.months[key]&&S.months[key].spotlight)){const sp=rotation(key);if(sp)await S.db.doc('months/'+key).set({spotlight:sp,by:S.uid})}
     await S.db.doc('spreads/'+id).set({month:key,uid:S.uid,intention:intent.slice(0,400),reversals:!!d.rev,cards:d.revealed.map(c=>({id:c.id,rev:!!c.rev})),stopped:!!d.stopped,clar:{},createdAt:old?old.createdAt:Date.now(),updatedAt:Date.now()});
     S.draft=freshDraft();S.drafts['d-int']='';delete S.redo[key];toast('Legging bewaard');
   }catch(e){toast(errMsg(e))}
@@ -634,7 +676,7 @@ function view(){
   if(S.tab==='maand')body=maandView();else if(S.tab==='kaarten')body=kaartenView();else if(S.tab==='leren')body=lerenView();else if(S.tab==='quiz')body=quizView();else if(S.tab==='nu')body=nuView();else body=groepView();
   return '<div class="screen"><header class="top"><div class="in"><div class="brand"><b>Maanlegging</b><button type="button" class="who" data-act="tab" data-tab="groep" aria-label="Groep en instellingen" aria-current="'+(S.tab==='groep')+'">'+esc(me()?me().name:'Groep')+' <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" style="vertical-align:-3px"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17.2" cy="9" r="2.4"/><path d="M17 14c2.4 0 4.2 1.6 4.2 4.2"/></svg></button></div>'
    +'<nav class="tabs" aria-label="Onderdelen">'+tabs.map(t=>'<button type="button" data-act="tab" data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'">'+t[1]+'</button>').join('')+'</nav></div></header>'
-   +'<main class="wrap">'+body+'</main></div>';
+   +'<main class="wrap">'+moonBarHtml()+body+'</main></div>';
 }
 
 function authPanel(){
@@ -685,32 +727,46 @@ function maandView(){
   if(!me()){
     h+=joinPanel();return h;
   }
-  h+=spotlightPanel(key);
+  h+=checkinPanel();
+  h+=readingPanel(key);
   const myId=spreadId(key,S.uid),mine=S.spreads[myId];
   if(!mine||S.redo[key])h+=composer(key,!!mine);
-  const spot=spotlightOf(key),all=spreadsOf(key);
-  const ordered=all.slice().sort((a,b)=>(b.uid===spot)-(a.uid===spot)||(a.uid===S.uid?-1:1)-(b.uid===S.uid?-1:1));
-  ordered.forEach(sp=>{if(!(sp.uid===S.uid&&S.redo[key]))h+=spreadCard(sp,sp.uid===spot)});
-  if(!all.length&&(mine||S.redo[key]))h+='';
+  const subj=activeAssign(key)[S.uid],all=spreadsOf(key);
+  const ordered=all.slice().sort((a,b)=>(b.uid===subj)-(a.uid===subj)||(a.uid===S.uid?-1:1)-(b.uid===S.uid?-1:1));
+  ordered.forEach(sp=>{if(!(sp.uid===S.uid&&S.redo[key]))h+=spreadCard(sp)});
   if(!all.length)h+='<div class="panel flat"><p class="muted">Nog niemand heeft deze maand gelegd.</p></div>';
+  h+=checkinsOfMonth(key);
   return h;
 }
 
 function joinPanel(){
   if(S.members.length>=4)return '<div class="panel"><h2>De groep zit vol</h2><p>Er doen al vier mensen mee: '+S.members.map(m=>esc(m.name)).join(', ')+'. Je kunt wel alles meelezen.</p></div>';
-  return '<div class="panel"><h2>Wie ben jij?</h2><p>Vul één keer je naam in. Je naam staat dan bij je leggingen en opmerkingen. Met maximaal vier deelnemers draait de spotlight elke maand door.</p>'
+  return '<div class="panel"><h2>Wie ben jij?</h2><p>Vul één keer je naam in. Je naam staat dan bij je leggingen en opmerkingen. Met maximaal vier deelnemers leest iedereen elke maand de legging van een ander teamlid.</p>'
    +'<label class="label" for="join-name">Jouw naam</label><input type="text" id="join-name" maxlength="30" value="'+esc(S.drafts['join-name']!=null?S.drafts['join-name']:S.myName)+'" autocomplete="off">'
    +'<div class="row"><button type="button" class="btn primary" data-act="join">Doe mee</button><span class="muted small">'+S.members.length+' van 4 aangemeld</span></div></div>';
 }
 
-function spotlightPanel(key){
-  const spot=spotlightOf(key);
-  let h='<section class="panel hl"><div class="row between"><div class="stack" style="gap:2px"><span class="label">In de spotlight</span><h2>'+esc(spot?nameOf(spot):'Nog niemand')+'</h2></div>'
-   +'<div class="stack" style="gap:4px;min-width:150px"><label class="label" for="spot-sel">Wijzig spotlight</label><select id="spot-sel" data-chg="spot">'
-   +members().map(m=>'<option value="'+esc(m.id)+'"'+(m.id===spot?' selected':'')+'>'+esc(m.name)+'</option>').join('')+'</select></div></div>'
-   +'<p class="muted small">Alle vier leggen ze een Nieuwe-maanlegging. De anderen delen hun legging en leren van elkaars beeld. Wie in de spotlight staat, krijgt van de andere drie een waarzegging als audionoot.</p>'
-   +'</section>';
-  return h;
+/* leesopdracht van deze maand: alleen tonen voor de huidige/komende maand of als er al een toewijzing is opgeslagen */
+function activeAssign(key){
+  const stored=S.months[key]&&S.months[key].assign;
+  return (stored||key>=monthKey(new Date()))?assignOf(key):{};
+}
+function readingPanel(key){
+  const as=activeAssign(key),ids=Object.keys(as);
+  if(!ids.length){
+    return key>=monthKey(new Date())&&S.members.length<2?'<section class="panel hl"><div class="stack" style="gap:2px"><span class="label">Leesopdracht</span><h2>Wacht op een tweede deelnemer</h2></div><p class="muted small">Zodra er minstens twee mensen meedoen, leest iedereen de legging van een ander teamlid.</p></section>':'';
+  }
+  const subj=as[S.uid],reader=readerOf(key,S.uid);
+  const sid=subj?spreadId(key,subj):null,sp=sid?S.spreads[sid]:null;
+  const done=sid?notesOf(sid,'reading').some(n=>n.author===S.uid):false;
+  const mineSid=spreadId(key,S.uid),mineRead=notesOf(mineSid,'reading').length>0;
+  let h='<section class="panel hl"><div class="stack" style="gap:2px"><span class="label">Jouw leesopdracht</span><h2>'+(subj?'Lees de legging van '+esc(nameOf(subj)):'Nog geen opdracht voor jou')+'</h2></div>';
+  if(subj){
+    h+='<p>'+(done?'Je lezing voor '+esc(nameOf(subj))+' staat erop. ✓':(sp?'De legging van '+esc(nameOf(subj))+' staat hieronder klaar. Neem je lezing op als audionoot en deel wat je ziet.':esc(nameOf(subj))+' heeft nog niet gelegd. Zodra de legging er staat, verschijnt hij hieronder en kun je hem lezen.'))+'</p>';
+  }
+  if(reader)h+='<p class="muted small">Jouw legging wordt gelezen door <b>'+esc(nameOf(reader))+'</b>'+(mineRead?'. Er staat al een lezing voor je. 🌙':(S.spreads[mineSid]?'. Die lezing komt nog.':'. Leg eerst je eigen legging, dan kan '+esc(nameOf(reader))+' hem lezen.'))+'</p>';
+  h+='<details><summary class="small muted" style="cursor:pointer">Wie leest wie deze maand?</summary><ul class="hw" style="margin-top:8px">'+ids.map(r=>'<li><span>'+esc(nameOf(r))+'</span><b>leest '+esc(nameOf(as[r]))+'</b></li>').join('')+'</ul></details>';
+  return h+'</section>';
 }
 
 function slotClosed(i,label){const p=POS[i];return '<div class="slot"><span class="pos"><b>'+p.n+'</b><span>'+esc(p.name)+'</span></span><span class="art back"></span><span class="nm muted">'+esc(label||'Gesloten')+'</span></div>'}
@@ -759,10 +815,11 @@ function composer(key,isRedo){
   return h;
 }
 
-function spreadCard(sp,isSpot){
+function spreadCard(sp){
   const sid=spreadId(sp.month,sp.uid),mineSp=sp.uid===S.uid,owner=nameOf(sp.uid);
+  const readerId=readerOf(sp.month,sp.uid),act_=activeAssign(sp.month),iRead=!!readerId&&readerId===S.uid&&!mineSp&&Object.keys(act_).length>0;
   const cards=(sp.cards||[]).map(c=>({c:BYID[c.id],rev:c.rev}));
-  let h='<section class="panel"><div class="row between"><div class="stack" style="gap:2px"><span class="label">'+(mineSp?'Jouw legging':'Legging van '+esc(owner))+'</span><h2>'+esc(owner)+(isSpot?' · spotlight':'')+'</h2></div>'
+  let h='<section class="panel"><div class="row between"><div class="stack" style="gap:2px"><span class="label">'+(mineSp?'Jouw legging':'Legging van '+esc(owner))+'</span><h2>'+esc(owner)+'</h2>'+(iRead?'<span class="chip ok">Jij leest deze legging</span>':(readerId&&Object.keys(act_).length?'<span class="chip">Gelezen door '+esc(nameOf(readerId))+'</span>':''))+'</div>'
    +(mineSp?'<button type="button" class="btn sm" data-act="redo">Opnieuw leggen</button>':'')+'</div>';
   if(sp.intention)h+='<div class="stack" style="gap:2px"><span class="label">Intentie</span><div class="quote">'+esc(sp.intention)+'</div></div>';
   h+='<div class="row4">';
@@ -784,11 +841,13 @@ function spreadCard(sp,isSpot){
   h+='<div class="stack"><span class="label">Eigen interpretatie</span>'+(own.length?own.map(noteHtml).join(''):'<p class="muted small">Nog geen interpretatie toegevoegd.</p>');
   if(mineSp)h+=noteForm('own',sid,'Wat zie jij in je legging? Tekst en audio zijn allebei optioneel.','Bewaar interpretatie');
   h+='</div>';
-  if(isSpot){
-    const rd=notesOf(sid,'reading');
-    h+='<div class="stack"><span class="label">Waarzeggingen van de anderen</span>'+(rd.length?rd.map(noteHtml).join(''):'<p class="muted small">Nog geen waarzeggingen. De andere drie nemen elk een verhaal op als audionoot.</p>');
-    if(!mineSp)h+=noteForm('reading',sid,'Vertel wat je ziet in deze legging. Neem tot 5 minuten op met de knop Opnemen, tekst erbij mag.','Bewaar waarzegging',true);
-    h+='</div>';
+  {
+    const rd=notesOf(sid,'reading'),hasR=Object.keys(act_).length>0&&readerId;
+    if(rd.length||hasR){
+      h+='<div class="stack"><span class="label">Waarzegging'+(hasR?' door '+esc(nameOf(readerId)):'')+'</span>'+(rd.length?rd.map(noteHtml).join(''):'<p class="muted small">Nog geen waarzegging. '+esc(nameOf(readerId))+' neemt een verhaal op als audionoot.</p>');
+      if(iRead&&!rd.some(n=>n.author===S.uid))h+=noteForm('reading',sid,'Vertel wat je ziet in deze legging. Neem tot 5 minuten op met de knop Opnemen, tekst erbij mag.','Bewaar waarzegging',true);
+      h+='</div>';
+    }
   }
   const pt=notesOf(sid,'point');
   h+='<div class="stack"><span class="label">Aanvullingen</span>'+(pt.length?pt.map(noteHtml).join(''):'<p class="muted small">Nog geen aanvullingen.</p>');
@@ -1038,6 +1097,170 @@ function moonPanel(){
    +'<p class="muted small">Open het gedownloade bestand en kies je agenda-app. Iedereen doet dit één keer op de eigen telefoon.</p></section>';
 }
 
+/* ---------- maanbalk: countdown, fase, sterrenbeeld en verduisteringen ---------- */
+const SIGNS=[['Ram','♈'],['Stier','♉'],['Tweelingen','♊'],['Kreeft','♋'],['Leeuw','♌'],['Maagd','♍'],['Weegschaal','♎'],['Schorpioen','♏'],['Boogschutter','♐'],['Steenbok','♑'],['Waterman','♒'],['Vissen','♓']];
+const MOON_EMO=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'];
+/* verduisteringen volgens NASA (datum in UTC), t/m 2030 */
+const SOLAR_ECL=[['2026-02-17','ringvormige'],['2026-08-12','totale'],['2027-02-06','ringvormige'],['2027-08-02','totale'],['2028-01-26','ringvormige'],['2028-07-22','totale'],['2029-01-14','gedeeltelijke'],['2029-06-12','gedeeltelijke'],['2029-07-11','gedeeltelijke'],['2029-12-05','gedeeltelijke'],['2030-06-01','ringvormige'],['2030-11-25','totale']];
+const LUNAR_ECL=[['2026-03-03','totale'],['2026-08-28','gedeeltelijke'],['2027-02-20','halfschaduw'],['2027-07-18','halfschaduw'],['2027-08-17','halfschaduw'],['2028-01-12','gedeeltelijke'],['2028-07-06','gedeeltelijke'],['2028-12-31','totale'],['2029-06-26','totale'],['2029-12-20','totale'],['2030-06-15','gedeeltelijke'],['2030-12-09','halfschaduw']];
+function sunLon(d){
+  const T=(d.getTime()/86400000+2440587.5-2451545)/36525,r=Math.PI/180;
+  const L0=280.46646+36000.76983*T+0.0003032*T*T,M=(357.52911+35999.05029*T-0.0001537*T*T)*r;
+  const C=(1.914602-0.004817*T-0.000014*T*T)*Math.sin(M)+(0.019993-0.000101*T)*Math.sin(2*M)+0.000289*Math.sin(3*M);
+  const om=(125.04-1934.136*T)*r;
+  return (((L0+C-0.00569-0.00478*Math.sin(om))%360)+360)%360;
+}
+const signAt=d=>SIGNS[Math.floor(sunLon(d)/30)];
+const nlKey=d=>{const p=nlParts(d);return p.slice(0,4)+'-'+p.slice(4,6)+'-'+p.slice(6,8)};
+const dayDiff=(a,b)=>{const x=a.split('-').map(Number),y=b.split('-').map(Number);return Math.round((Date.UTC(y[0],y[1]-1,y[2])-Date.UTC(x[0],x[1]-1,x[2]))/864e5)};
+function moonState(now){
+  const prevs=newMoons(new Date(now.getTime()-33*864e5),3).filter(d=>d<=now),prev=prevs[prevs.length-1],nxt=newMoons(now,1)[0];
+  const f=(now-prev)/(nxt-prev);
+  const name=f<.03||f>.97?'nieuwe maan':f<.22?'wassende sikkel':f<.28?'eerste kwartier':f<.47?'wassende maan':f<.53?'volle maan':f<.72?'afnemende maan':f<.78?'laatste kwartier':'afnemende sikkel';
+  return {prev,nxt,f,name,emo:MOON_EMO[Math.round(f*8)%8],lit:Math.round((1-Math.cos(2*Math.PI*f))/2*100)};
+}
+function eclipseNotes(m,now){
+  const out=[],today=nlKey(now),target=nlKey(m.prev)===today?m.prev:m.nxt,tk=nlKey(target);
+  SOLAR_ECL.forEach(e=>{if(Math.abs(dayDiff(e[0],tk))<=1)out.push('Zonsverduistering: een '+e[1]+' zonsverduistering rond deze nieuwe maan')});
+  LUNAR_ECL.forEach(e=>{const dd=dayDiff(today,e[0]);if(dd>=0&&dd<=dayDiff(today,nlKey(m.nxt))+1)out.push('Maansverduistering op '+dayLbl(e[0])+': '+(e[1]==='halfschaduw'?'een halfschaduw-maansverduistering (subtiel, nauwelijks te zien)':'een '+e[1]+' maansverduistering')+' rond de volle maan')});
+  return out;
+}
+function moonBarHtml(){
+  const now=new Date(),m=moonState(now),today=nlKey(now),ms=m.nxt-now,tgt=nlKey(m.prev)===today?m.prev:m.nxt,sg=signAt(tgt);
+  const hm=d=>new Intl.DateTimeFormat('nl-NL',{timeZone:'Europe/Amsterdam',hour:'2-digit',minute:'2-digit'}).format(d);
+  const dt=new Intl.DateTimeFormat('nl-NL',{timeZone:'Europe/Amsterdam',weekday:'long',day:'numeric',month:'long'}).format(tgt);
+  let title;
+  if(nlKey(m.prev)===today)title='Vandaag is het nieuwe maan 🌑 Tijd voor je maanlegging';
+  else if(nlKey(m.nxt)===today)title='Vandaag om '+hm(m.nxt)+' is het nieuwe maan';
+  else{const d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/36e5),mi=Math.floor(ms%36e5/6e4);title='Nieuwe maan '+(d>=1?'over '+d+(d===1?' dag':' dagen')+(h?' en '+h+' uur':''):'over '+h+' uur en '+mi+' min')}
+  const ec=eclipseNotes(m,now);
+  return '<section class="moonbar" id="moonbar" aria-label="Volgende nieuwe maan"><span class="mb-ico" aria-hidden="true">'+m.emo+'</span><div class="mb-txt"><b>'+esc(title)+'</b>'
+   +'<span>'+esc(cap(dt))+', '+hm(tgt)+' · nieuwe maan in '+sg[1]+' '+esc(sg[0])+'</span>'
+   +'<span class="mb-sub">Nu: '+esc(m.name)+' · '+m.lit+'% verlicht</span>'
+   +(ec.length?'<span class="mb-ec">'+ec.map(x=>'<span class="chip warn">⚠ '+esc(x)+'</span>').join('')+'</span><span class="mb-sub">Sommige mensen ervaren een verduistering als een extra beladen moment. Neem er rustig de tijd voor.</span>':'')
+   +'</div></section>';
+}
+
+/* ---------- terugblik aan het eind van de maan ---------- */
+const CI_FIT=['Niet echt','Een beetje','Duidelijk'];
+const ciId=(cycle,uid)=>cycle+'__'+uid;
+function ciWindow(){
+  const starts=cycleStarts(),today=dayKey(new Date()),cur=cycleOf(today,starts);if(!cur)return null;
+  const i=starts.indexOf(cur),nx=starts[i+1],prev=starts[i-1];
+  if(nx&&dayDiff(today,nx)<=4)return {cycle:cur,end:nx,closing:true,starts};
+  if(prev&&dayDiff(cur,today)<=6)return {cycle:prev,end:cur,closing:false,starts};
+  return null;
+}
+const starsHtml=n=>'<span class="stars" aria-label="'+n+' van 5">'+'★'.repeat(n)+'<span class="off">'+'★'.repeat(5-n)+'</span></span>';
+function ciItem(c){
+  return '<li class="ciitem"><div class="row" style="gap:8px"><b>'+esc(nameOf(c.uid))+(c.uid===S.uid?' <span class="muted small">(jij)</span>':'')+'</b>'+starsHtml(c.val||0)+'<span class="chip">Kwam terug: '+esc(CI_FIT[c.fit]||'')+'</span></div>'+(c.text?'<p>'+esc(c.text)+'</p>':'')+'</li>';
+}
+function checkinPanel(){
+  const w=ciWindow();if(!w||!me())return '';
+  const id=ciId(w.cycle,S.uid),mine=S.checkins.find(c=>c.id===id),editing=S.ciEdit===w.cycle,range=cycleRange(w.cycle,w.starts);
+  const others=S.checkins.filter(c=>c.cycle===w.cycle).sort((a,b)=>(a.at||0)-(b.at||0));
+  const sp=S.spreads[spreadId(w.cycle.slice(0,7),S.uid)];
+  let h='<section class="panel hl"><div class="stack" style="gap:2px"><span class="label">Terugblik op de maan van '+esc(range)+'</span><h2>Hoe kijk je terug op je maanlegging van deze maand?</h2></div>';
+  if(sp&&sp.cards)h+='<div class="cicards" aria-label="Jouw legging van deze maand">'+sp.cards.map(x=>BYID[x.id]?'<span>'+artHtml(BYID[x.id],x.rev)+'</span>':'').join('')+'</div>';
+  if(!mine||editing){
+    const f=S.ci;
+    h+='<p class="muted small">'+(w.closing?'De maan loopt bijna af (nieuwe maan op '+esc(dayLbl(w.end))+'). ':'De vorige maan is net afgelopen. ')+'Je antwoord is zichtbaar voor de groep, zodra jij het deelt zie je ook de terugblikken van de anderen.</p>'
+     +'<div class="stack" style="gap:6px"><span class="label">Hoe waardevol was je maanlegging voor je?</span><div class="row" style="gap:6px" role="group" aria-label="Waardering van 1 tot 5">'
+     +[1,2,3,4,5].map(n=>'<button type="button" class="segbtn starbtn" data-act="ci-val" data-v="'+n+'" aria-pressed="'+(f.val>=n)+'" aria-label="'+n+' van 5">★</button>').join('')+'<span class="muted small">'+(f.val?['','Nauwelijks','Een beetje','Redelijk','Waardevol','Heel waardevol'][f.val]:'Kies een waardering')+'</span></div></div>'
+     +'<div class="stack" style="gap:6px"><span class="label">Kwam wat de kaarten lieten zien terug in je maand?</span><div class="row" style="gap:6px" role="group">'
+     +CI_FIT.map((t,i)=>'<button type="button" class="segbtn" data-act="ci-fit" data-v="'+i+'" aria-pressed="'+(f.fit===i)+'">'+t+'</button>').join('')+'</div></div>'
+     +'<div class="stack" style="gap:6px"><label class="label" for="ci-text">Vertel in een paar zinnen hoe je terugkijkt (optioneel)</label><textarea id="ci-text" maxlength="800" placeholder="Wat klopte, wat verraste je, wat neem je mee naar de volgende maan?">'+esc(S.drafts['ci-text']||'')+'</textarea></div>'
+     +'<div class="row"><button type="button" class="btn primary" data-act="ci-save" '+(f.val&&f.fit>=0&&!S.busy.ci?'':'disabled')+'>'+(S.busy.ci?'Bewaren…':'Deel mijn terugblik')+'</button>'+(editing?'<button type="button" class="btn ghost" data-act="ci-cancel">Annuleren</button>':'')+'</div>';
+  }else{
+    h+='<p>Je terugblik is gedeeld. ✓ Bedankt!</p><div class="row"><button type="button" class="btn sm" data-act="ci-edit">Pas mijn terugblik aan</button></div>';
+  }
+  if(mine&&!editing){const o=others.filter(c=>c.uid!==S.uid);h+='<div class="stack" style="gap:8px"><span class="label">Terugblikken van de anderen</span>'+(o.length?'<ul class="hw cilist">'+o.map(ciItem).join('')+'</ul>':'<p class="muted small">De anderen hebben nog niet teruggeblikt.</p>')+'</div>'}
+  return h+'</section>';
+}
+function checkinsOfMonth(key){
+  const w=ciWindow();if(w&&w.cycle.slice(0,7)===key)return '';
+  const list=S.checkins.filter(c=>c.month===key).sort((a,b)=>(a.at||0)-(b.at||0));
+  if(!list.length)return '';
+  return '<section class="panel"><span class="label">Terugblik op deze maand</span><ul class="hw cilist">'+list.map(ciItem).join('')+'</ul></section>';
+}
+async function saveCheckin(){
+  const w=ciWindow();if(!w||!S.ci.val||S.ci.fit<0)return;
+  S.busy.ci=true;render();
+  try{
+    await S.db.doc('checkins/'+ciId(w.cycle,S.uid)).set({uid:S.uid,cycle:w.cycle,month:w.cycle.slice(0,7),val:S.ci.val,fit:S.ci.fit,text:(S.drafts['ci-text']||'').trim().slice(0,800),at:Date.now()});
+    S.ciEdit=null;S.drafts['ci-text']='';S.ci={val:0,fit:-1};toast('Terugblik gedeeld met de groep');
+  }catch(e){toast(errMsg(e))}
+  delete S.busy.ci;render();
+}
+
+/* ---------- pushmeldingen (alleen op de GitHub-pagina) ---------- */
+const VAPID_PUB=(window.SB_CONFIG&&window.SB_CONFIG.vapid)||'BMBKMHX2L5OYKrNZydyZ1-kyZfBCCbVHZGI2BGVXNOG_n7E24oSKiHV96oVoAULpys3ujBeOFrI9TkWX0MOJGvQ';
+const pushSupported=()=>!!(S.sb&&VAPID_PUB&&'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window);
+const isIos=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isStandalone=()=>(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
+function b64u(x){const p='='.repeat((4-x.length%4)%4),r=atob((x+p).replace(/-/g,'+').replace(/_/g,'/')),a=new Uint8Array(r.length);for(let i=0;i<r.length;i++)a[i]=r.charCodeAt(i);return a}
+const PUSH_KINDS=[['moon','Nieuwe maan (08:00)'],['reading','Nieuwe leggingen en lezingen'],['quiz','Daily quiz herinnering (17:00)'],['checkin','Terugblik aan het eind van de maan']];
+async function savePushSub(sub){
+  const r=await S.sb.from('push_subs').upsert({endpoint:sub.endpoint,uid:S.uid,sub:sub.toJSON(),prefs:S.push.prefs,updated_at:new Date().toISOString()});
+  if(r.error)throw r.error;
+}
+async function pushInit(){
+  if(!pushSupported())return;
+  try{
+    const reg=await navigator.serviceWorker.register('sw.js'),sub=await reg.pushManager.getSubscription();
+    S.push.on=!!sub&&Notification.permission==='granted';
+    if(sub&&S.push.on){const r=await S.sb.from('push_subs').select('prefs').eq('endpoint',sub.endpoint).maybeSingle();if(r.data&&r.data.prefs)S.push.prefs=Object.assign(S.push.prefs,r.data.prefs);else await savePushSub(sub)}
+  }catch(e){}
+  render();
+}
+async function pushEnable(){
+  S.push.busy=true;S.push.err='';render();
+  try{
+    if(isIos()&&!isStandalone())throw new Error('Zet de app eerst op je beginscherm (Deel, dan Zet op beginscherm) en open hem daar.');
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted')throw new Error('Meldingen zijn niet toegestaan. Je kunt dat aanpassen in de instellingen van je telefoon.');
+    const reg=await navigator.serviceWorker.register('sw.js');await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID_PUB)});
+    await savePushSub(sub);S.push.on=true;toast('Meldingen staan aan');
+  }catch(e){S.push.err=String(e&&e.message||e)}
+  S.push.busy=false;render();
+}
+async function pushDisable(){
+  S.push.busy=true;render();
+  try{
+    const reg=await navigator.serviceWorker.getRegistration(),sub=reg&&await reg.pushManager.getSubscription();
+    if(sub){await S.sb.from('push_subs').delete().eq('endpoint',sub.endpoint);await sub.unsubscribe()}
+    S.push.on=false;toast('Meldingen staan uit');
+  }catch(e){S.push.err=String(e&&e.message||e)}
+  S.push.busy=false;render();
+}
+async function pushPref(k){
+  S.push.prefs[k]=!S.push.prefs[k];render();
+  try{const reg=await navigator.serviceWorker.getRegistration(),sub=reg&&await reg.pushManager.getSubscription();if(sub)await savePushSub(sub)}catch(e){S.push.err=String(e&&e.message||e);render()}
+}
+async function pushTest(){
+  S.push.busy=true;render();
+  try{const r=await S.sb.functions.invoke('notify',{body:{type:'test'}});if(r.error)throw r.error;toast('Testmelding is onderweg')}
+  catch(e){S.push.err='Testmelding mislukt. Staat de functie "notify" in Supabase aan? ('+String(e&&e.message||e)+')'}
+  S.push.busy=false;render();
+}
+function pushPanel(){
+  if(!S.sb)return '';
+  if(!pushSupported())return '<section class="panel"><span class="label">Meldingen</span><p class="muted small">Meldingen werken pas als de beheerder ze heeft ingesteld (zie de README, stap Meldingen) en in een browser die dat ondersteunt.</p></section>';
+  const p=S.push;
+  let h='<section class="panel"><span class="label">Meldingen</span>';
+  if(isIos()&&!isStandalone())h+='<div class="notice">Op een iPhone werken meldingen alleen als je de app op je beginscherm zet: tik op Deel, dan op Zet op beginscherm, en open de app vanaf het icoon. Zet daarna hier de meldingen aan. Dit werkt vanaf iOS 16.4.</div>';
+  if(!p.on){
+    h+='<p>Krijg een melding bij nieuwe maan, als iemand een legging of lezing deelt, voor de daily quiz en voor de terugblik.</p><div class="row"><button type="button" class="btn primary" data-act="push-on" '+(p.busy?'disabled':'')+'>'+(p.busy?'Bezig…':'Zet meldingen aan')+'</button></div>';
+  }else{
+    h+='<p>Meldingen staan aan op dit toestel. ✓</p><div class="stack" style="gap:6px">'+PUSH_KINDS.map(k=>'<label class="row small" style="gap:8px"><input type="checkbox" data-chg="pushpref" data-k="'+k[0]+'" '+(p.prefs[k[0]]!==false?'checked':'')+'> '+esc(k[1])+'</label>').join('')+'</div>'
+     +'<div class="row"><button type="button" class="btn sm" data-act="push-test" '+(p.busy?'disabled':'')+'>Stuur een testmelding</button><button type="button" class="btn sm ghost" data-act="push-off" '+(p.busy?'disabled':'')+'>Zet meldingen uit</button></div>';
+  }
+  if(p.err)h+='<div class="notice stop">'+esc(p.err)+'</div>';
+  return h+'</section>';
+}
+
 /* ---------- Nu-kaart: een losse kaart voor dit moment ---------- */
 async function saveNu(){
   const n=S.nu;if(!n.card){toast('Draai eerst je kaart om.');return}
@@ -1123,12 +1346,12 @@ function groepView(){
    +ms.map((m,i)=>'<li><span>'+(i+1)+'. '+esc(m.name)+(m.id===S.uid?' <span class="chip">jij</span>':'')+'</span></li>').join('')+'</ul>'
    +(ms.length<4?'<p class="muted small">Nog '+(4-ms.length)+' plek'+(4-ms.length===1?'':'ken')+' vrij. Elke deelnemer meldt zich één keer aan op het tabblad Maanlegging.</p>':'')+'</section>';
   h+=moonPanel();
+  h+=pushPanel();
   if(me())h+='<section class="panel"><label class="label" for="rename">Naam aanpassen</label><input type="text" id="rename" maxlength="30" value="'+esc(S.drafts['rename']!=null?S.drafts['rename']:me().name)+'"><div class="row"><button type="button" class="btn sm" data-act="rename">Bewaar naam</button></div></section>';
   if(S.sb)h+='<section class="panel"><div class="row between"><span class="small muted">Ingelogd</span><button type="button" class="btn sm" data-act="signout">Uitloggen</button></div></section>';
-  if(ms.length){
-    const now=new Date(),rows=[];
-    for(let i=0;i<6;i++){const k=monthKey(new Date(now.getFullYear(),now.getMonth()+i,1));rows.push('<li><span>'+esc(monthLabel(k))+'</span><b>'+esc(nameOf(spotlightOf(k)))+'</b></li>')}
-    h+='<section class="panel"><span class="label">Spotlight de komende maanden</span><ul class="hw">'+rows.join('')+'</ul><p class="muted small">De volgorde volgt de aanmeldvolgorde. Je kunt de spotlight per maand wijzigen op het tabblad Maanlegging.</p></section>';
+  {
+    const key=monthKey(new Date()),as=activeAssign(key),ids=Object.keys(as);
+    if(ids.length)h+='<section class="panel"><span class="label">Wie leest wie in '+esc(monthLabel(key))+'</span><ul class="hw">'+ids.map(r=>'<li><span>'+esc(nameOf(r))+(r===S.uid?' <span class="chip">jij</span>':'')+'</span><b>leest '+esc(nameOf(as[r]))+'</b></li>').join('')+'</ul><p class="muted small">Elke maand wordt de verdeling opnieuw geloot. Je leest nooit je eigen legging en krijgt niet twee keer achter elkaar dezelfde persoon.</p></section>';
   }
   return h+'</div>';
 }
@@ -1201,6 +1424,14 @@ function act(a,t){
     case 'quiz-start':quizStart();break;
     case 'quiz-pick':quizAnswer(+d.i);break;
     case 'moon-ics':downloadMoonIcs();break;
+    case 'ci-val':S.ci.val=+d.v;break;
+    case 'ci-fit':S.ci.fit=+d.v;break;
+    case 'ci-edit':{const w=ciWindow(),m=w&&S.checkins.find(c=>c.id===ciId(w.cycle,S.uid));if(m){S.ci={val:m.val||0,fit:m.fit==null?-1:m.fit};S.drafts['ci-text']=m.text||'';S.ciEdit=w.cycle}break}
+    case 'ci-cancel':S.ciEdit=null;S.drafts['ci-text']='';S.ci={val:0,fit:-1};break;
+    case 'ci-save':saveCheckin();return;
+    case 'push-on':pushEnable();return;
+    case 'push-off':pushDisable();return;
+    case 'push-test':pushTest();return;
     case 'quiz-next':S.quizFeed=null;render();break;
     case 'month':{const l=monthsList(),i=l.indexOf(S.month)+Number(d.d);if(i>=0&&i<l.length){S.month=l[i];S.draft=freshDraft()}break}
     case 'join':joinGroup();return;
@@ -1259,7 +1490,7 @@ document.addEventListener('change',e=>{
     return;
   }
   const c=el.dataset&&el.dataset.chg;if(!c)return;
-  if(c==='spot')setSpotlight(el.value);
+  if(c==='pushpref'){pushPref(el.dataset.k)}
   else if(c==='rev'){S.draft.rev=el.checked;render()}
   else if(c==='nurev'){S.nu.rev=el.checked;render()}
   else if(c==='pickrev'){S.sheet.rev=el.checked;render()}
@@ -1333,13 +1564,18 @@ async function boot(){
   }
   if(!db||!S.uid){S.noDb=true;render();return}
   const fail=e=>{toast(errMsg(e))};
-  db.collection('members').onSnapshot(sn=>{S.members=sn.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0)||(a.id<b.id?-1:1));S.ready.members=true;render()},fail);
-  db.collection('months').onSnapshot(sn=>{S.months={};sn.docs.forEach(d=>S.months[d.id]=d.data());render()},fail);
+  db.collection('members').onSnapshot(sn=>{S.members=sn.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0)||(a.id<b.id?-1:1));S.ready.members=true;ensureAssign();render()},fail);
+  db.collection('months').onSnapshot(sn=>{S.months={};sn.docs.forEach(d=>S.months[d.id]=d.data());S.ready.months=true;ensureAssign();render()},fail);
   db.collection('spreads').onSnapshot(sn=>{S.spreads={};sn.docs.forEach(d=>S.spreads[d.id]=d.data());S.ready.spreads=true;render()},fail);
   db.collection('nukaarten').onSnapshot(sn=>{S.nuDocs=sn.docs.map(d=>Object.assign({id:d.id},d.data()));render()},fail);
   db.collection('quiz').onSnapshot(sn=>{S.quizDocs=sn.docs.map(d=>Object.assign({id:d.id},d.data()));render()},fail);
+  db.collection('checkins').onSnapshot(sn=>{S.checkins=sn.docs.map(d=>Object.assign({id:d.id},d.data()));render()},fail);
+  pushInit();
   db.collection('notes').onSnapshot(sn=>{S.notes=sn.docs.map(d=>Object.assign({id:d.id},d.data()));S.ready.notes=true;render()},fail);
 }
+const qt=new URLSearchParams(location.search).get('tab');if(['maand','nu','kaarten','leren','quiz','groep'].includes(qt))S.tab=qt;
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.tab){S.tab=e.data.tab;render()}});
+setInterval(()=>{const el=document.getElementById('moonbar');if(el)el.outerHTML=moonBarHtml()},60000);
 boot();
 })();
 </script>
