@@ -676,11 +676,21 @@ function view(){
   if(S.tab==='maand')body=maandView();else if(S.tab==='kaarten')body=kaartenView();else if(S.tab==='leren')body=lerenView();else if(S.tab==='quiz')body=quizView();else if(S.tab==='nu')body=nuView();else body=groepView();
   return '<div class="screen"><header class="top"><div class="in"><div class="brand"><b>Maanlegging</b><button type="button" class="who" data-act="tab" data-tab="groep" aria-label="Groep en instellingen" aria-current="'+(S.tab==='groep')+'">'+esc(me()?me().name:'Groep')+' <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" style="vertical-align:-3px"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17.2" cy="9" r="2.4"/><path d="M17 14c2.4 0 4.2 1.6 4.2 4.2"/></svg></button></div>'
    +'<nav class="tabs" aria-label="Onderdelen">'+tabs.map(t=>'<button type="button" data-act="tab" data-tab="'+t[0]+'" aria-current="'+(S.tab===t[0])+'">'+t[1]+'</button>').join('')+'</nav></div></header>'
-   +'<main class="wrap">'+moonBarHtml()+body+'</main></div>';
+   +'<main class="wrap">'+(S.tab==='quiz'?moonBarHtml():'')+body+'</main></div>';
 }
 
 function authPanel(){
   const up=S.authMode==='up',d=S.drafts;
+  if(S.authMode==='reset')return '<div class="panel"><h2>Nieuw wachtwoord instellen</h2><p class="muted small">Kies een nieuw wachtwoord voor je account (minstens 6 tekens).</p>'
+   +'<div class="stack" style="gap:4px"><label class="label" for="a-new">Nieuw wachtwoord</label><input type="password" id="a-new" autocomplete="new-password" value="'+esc(d['a-new']||'')+'"></div>'
+   +(S.authMsg?'<div class="notice">'+esc(S.authMsg)+'</div>':'')
+   +'<div class="row"><button type="button" class="btn primary" data-act="auth-newpw" '+(S.authBusy?'disabled':'')+'>'+(S.authBusy?'Bezig…':'Opslaan')+'</button>'
+   +'<button type="button" class="btn ghost" data-act="auth-cancel">Annuleren</button></div></div>';
+  if(S.authMode==='forgot')return '<div class="panel"><h2>Wachtwoord vergeten</h2><p class="muted small">Vul je e-mailadres in. Je krijgt een mail met een link om een nieuw wachtwoord te kiezen.</p>'
+   +'<div class="stack" style="gap:4px"><label class="label" for="a-email">E-mailadres</label><input type="email" id="a-email" autocomplete="email" inputmode="email" value="'+esc(d['a-email']||'')+'"></div>'
+   +(S.authMsg?'<div class="notice">'+esc(S.authMsg)+'</div>':'')
+   +'<div class="row"><button type="button" class="btn primary" data-act="auth-forgot-send" '+(S.authBusy?'disabled':'')+'>'+(S.authBusy?'Bezig…':'Stuur herstelmail')+'</button>'
+   +'<button type="button" class="btn ghost" data-act="auth-back">Terug naar inloggen</button></div></div>';
   return '<div class="panel"><h2>'+(up?'Maak een account':'Log in')+'</h2>'
    +'<p class="muted small">'+(up?'Eén keer aanmelden met je e-mailadres. Daarna blijf je op je telefoon ingelogd.':'Log in met het e-mailadres en wachtwoord waarmee je je hebt aangemeld.')+'</p>'
    +(up?'<div class="stack" style="gap:4px"><label class="label" for="a-name">Je naam</label><input type="text" id="a-name" maxlength="30" autocomplete="given-name" value="'+esc(d['a-name']||'')+'"></div>':'')
@@ -688,7 +698,32 @@ function authPanel(){
    +'<div class="stack" style="gap:4px"><label class="label" for="a-pass">Wachtwoord'+(up?' (minstens 6 tekens)':'')+'</label><input type="password" id="a-pass" autocomplete="'+(up?'new-password':'current-password')+'" value="'+esc(d['a-pass']||'')+'"></div>'
    +(S.authMsg?'<div class="notice">'+esc(S.authMsg)+'</div>':'')
    +'<div class="row"><button type="button" class="btn primary" data-act="auth-submit" '+(S.authBusy?'disabled':'')+'>'+(S.authBusy?'Bezig…':(up?'Aanmelden':'Inloggen'))+'</button>'
-   +'<button type="button" class="btn ghost" data-act="auth-toggle">'+(up?'Ik heb al een account':'Nog geen account? Meld je aan')+'</button></div></div>';
+   +'<button type="button" class="btn ghost" data-act="auth-toggle">'+(up?'Ik heb al een account':'Nog geen account? Meld je aan')+'</button>'
+   +(up?'':'<button type="button" class="btn ghost" data-act="auth-forgot">Wachtwoord vergeten?</button>')+'</div></div>';
+}
+async function doForgot(){
+  const email=(S.drafts['a-email']||'').trim();
+  if(!email){S.authMsg='Vul je e-mailadres in.';render();return}
+  S.authBusy=true;S.authMsg='';render();
+  try{
+    const r=await S.sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+    if(r.error)throw r.error;
+    S.authMsg='Gelukt. Als dit e-mailadres een account heeft, ligt er nu een mail met een link. Open die link op deze telefoon (kijk ook in je spam).';
+  }catch(e){
+    const m=String(e&&e.message||'');
+    S.authMsg=/rate limit|seconds/i.test(m)?'Even wachten: er is net al een mail verstuurd. Probeer het over een minuut opnieuw.':m||'Er ging iets mis.';
+  }
+  S.authBusy=false;render();
+}
+async function doNewPw(){
+  const pw=S.drafts['a-new']||'';
+  if(pw.length<6){S.authMsg='Je wachtwoord moet minstens 6 tekens hebben.';render();return}
+  S.authBusy=true;S.authMsg='';render();
+  try{
+    const r=await S.sb.auth.updateUser({password:pw});
+    if(r.error)throw r.error;
+    location.replace(location.origin+location.pathname);
+  }catch(e){S.authMsg=String(e&&e.message||'')||'Er ging iets mis.';S.authBusy=false;render()}
 }
 async function doAuth(){
   const d=S.drafts,email=(d['a-email']||'').trim(),pw=d['a-pass']||'',name=(d['a-name']||'').trim();
@@ -1348,7 +1383,7 @@ function groepView(){
   h+=moonPanel();
   h+=pushPanel();
   if(me())h+='<section class="panel"><label class="label" for="rename">Naam aanpassen</label><input type="text" id="rename" maxlength="30" value="'+esc(S.drafts['rename']!=null?S.drafts['rename']:me().name)+'"><div class="row"><button type="button" class="btn sm" data-act="rename">Bewaar naam</button></div></section>';
-  if(S.sb)h+='<section class="panel"><div class="row between"><span class="small muted">Ingelogd</span><button type="button" class="btn sm" data-act="signout">Uitloggen</button></div></section>';
+  if(S.sb)h+='<section class="panel"><div class="row between"><span class="small muted">Ingelogd</span><div class="row"><button type="button" class="btn sm" data-act="chgpw">Wachtwoord wijzigen</button><button type="button" class="btn sm" data-act="signout">Uitloggen</button></div></div></section>';
   {
     const key=monthKey(new Date()),as=activeAssign(key),ids=Object.keys(as);
     if(ids.length)h+='<section class="panel"><span class="label">Wie leest wie in '+esc(monthLabel(key))+'</span><ul class="hw">'+ids.map(r=>'<li><span>'+esc(nameOf(r))+(r===S.uid?' <span class="chip">jij</span>':'')+'</span><b>leest '+esc(nameOf(as[r]))+'</b></li>').join('')+'</ul><p class="muted small">Elke maand wordt de verdeling opnieuw geloot. Je leest nooit je eigen legging en krijgt niet twee keer achter elkaar dezelfde persoon.</p></section>';
@@ -1452,7 +1487,13 @@ function act(a,t){
     case 'sheet-close':S.sheet=null;break;
     case 'toggle-rws':if(S.sheet)S.sheet.rws=!S.sheet.rws;break;
     case 'auth-submit':doAuth();return;
+    case 'auth-forgot':S.authMode='forgot';S.authMsg='';break;
+    case 'auth-back':S.authMode='in';S.authMsg='';break;
+    case 'auth-cancel':location.replace(location.origin+location.pathname);return;
+    case 'auth-forgot-send':doForgot();return;
+    case 'auth-newpw':doNewPw();return;
     case 'auth-toggle':S.authMode=S.authMode==='up'?'in':'up';S.authMsg='';break;
+    case 'chgpw':S.noDb=true;S.authMode='reset';S.authMsg='';S.drafts['a-new']='';break;
     case 'signout':S.sb.auth.signOut().then(()=>location.reload());return;
     case 'pick-open':S.sheet={type:'pick',purpose:d.purpose,spread:d.spread,idx:d.idx!=null?Number(d.idx):0,rev:false};S.drafts['pick-q']='';break;
     case 'pick':pickCard(d.card);return;
@@ -1558,7 +1599,10 @@ async function boot(){
     try{
       await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js');
       S.sb=window.supabase.createClient(window.SB_CONFIG.url,window.SB_CONFIG.key);
+      const rec=/type=recovery/.test(location.hash);
+      S.sb.auth.onAuthStateChange(ev=>{if(ev==='PASSWORD_RECOVERY'){S.authMode='reset';S.authMsg='';S.noDb=true;render()}});
       const r=await S.sb.auth.getSession(),ses=r.data&&r.data.session;
+      if(rec&&ses){S.authMode='reset';S.noDb=true;render();return}
       if(ses){S.uid=ses.user.id;S.myName=(ses.user.user_metadata&&ses.user.user_metadata.name)||'';S.canWrite=true;db=makeSbDb(S.sb);S.db=db}
     }catch(e){S.sb=null;S.sbCfg=false;toast('De database is niet bereikbaar.')}
   }
